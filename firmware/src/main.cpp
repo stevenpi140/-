@@ -30,6 +30,10 @@ static void setupDisplay() {
 #if defined(BOARD_MATRIXPORTAL_S3)
   // R1, G1, B1, R2, G2, B2, A, B, C, D, E, LAT, OE, CLK
   cfg.gpio = {42, 41, 40, 38, 39, 37, 45, 36, 48, 35, 21, 47, 14, 2};
+#elif defined(BOARD_WAVESHARE_S3)
+  // 微雪 ESP32-S3-RGB-Matrix（腳位依微雪文件；E 腳是 GPIO 9）
+  // R1, G1, B1, R2, G2, B2, A, B, C, D, E, LAT, OE, CLK
+  cfg.gpio = {4, 5, 6, 7, 15, 16, 18, 8, 3, 42, 9, 40, 2, 41};
 #else
   // ESP32 Trinity／一般 ESP32：函式庫預設腳位，64x64 面板的 E 腳接 GPIO 18（Trinity 官方範例同設定）
   cfg.gpio.e = 18;
