@@ -1,0 +1,40 @@
+"""決定要輪播哪些頁面、每頁停多久，以及目前的亮度。"""
+
+from __future__ import annotations
+
+from datetime import datetime, time as dtime
+
+from .config import Config
+from .models import Game
+from .render import Page, Renderer
+
+
+def build(r: Renderer, cfg: Config, games: list[Game], now: datetime, note: str = "") -> list[Page]:
+    disp = cfg.display
+    hold = int(disp["page_seconds"] * 1000)
+    live_hold = int(disp["live_page_seconds"] * 1000)
+    if not games:
+        return [Page("idle", 15000, r.idle(now, note))]
+    pages: list[Page] = []
+    if len(games) > 1:
+        n = r.overview_rows
+        chunks = [games[i : i + n] for i in range(0, len(games), n)]
+        for i, c in enumerate(chunks):
+            pages.append(Page("overview", hold, r.overview(c, now, i + 1, len(chunks))))
+    for g in games:
+        pages.append(Page("game", live_hold if g.state == "live" else hold, r.game(g, now)))
+    return pages
+
+
+def _parse_hm(s: str) -> dtime:
+    h, m = s.split(":")
+    return dtime(int(h), int(m))
+
+
+def brightness(cfg: Config, now: datetime, any_live: bool) -> int:
+    b = cfg.raw["brightness"]
+    start, end, t = _parse_hm(b["night_start"]), _parse_hm(b["night_end"]), now.time()
+    night = (start <= t or t < end) if start > end else (start <= t < end)
+    if night and not any_live:
+        return int(b["night"])
+    return int(b["day"])

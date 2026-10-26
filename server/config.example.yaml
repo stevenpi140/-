@@ -1,0 +1,45 @@
+# 複製成 config.yaml 再修改：cp config.example.yaml config.yaml
+timezone: Asia/Taipei
+
+display:
+  width: 128          # 必須和韌體 include/config.h 的面板尺寸一致
+  height: 64
+  page_seconds: 8     # 一般頁面停留秒數
+  live_page_seconds: 12  # 比賽進行中的頁面停留秒數
+  # fonts:            # 想換字型時再打開
+  #   small: fonts/fusion-pixel-12px-proportional-zh_hant.otf
+  #   large: /usr/share/fonts/opentype/unifont/unifont.otf
+
+brightness:
+  day: 160            # 0-255
+  night: 30           # 夜間模式（有比賽進行中時仍用 day 亮度）
+  night_start: "23:30"
+  night_end: "07:00"
+
+poll:
+  live_seconds: 15    # 有比賽進行中：每 15 秒更新一次比分
+  soon_seconds: 60    # 30 分鐘內有比賽要開打
+  idle_seconds: 600   # 其他時間
+
+# teams 留空 [] = 該聯盟全部比賽都顯示
+# 可以填英文縮寫（MLB/NBA）或中文隊名關鍵字（台灣聯盟）
+leagues:
+  cpbl:
+    enabled: true
+    teams: []                 # 例：[中信, 味全]
+  mlb:
+    enabled: true
+    teams: [LAD, NYY]         # 例：道奇、洋基。縮寫見 scoreboard/teams.py
+  nba:
+    enabled: true
+    teams: [GSW, LAL]         # 例：勇士、湖人
+  tpbl:
+    enabled: true
+    teams: []                 # 例：[國王, 戰神]
+  plg:
+    enabled: true
+    teams: []
+
+# 官方隊名 -> 你想顯示的短名（覆寫自動縮寫）
+aliases: {}
+#  臺北富邦勇士: 富邦
