@@ -92,10 +92,35 @@ async def _probe(cfg: Config, which: list[str], day: date, out: Path):
                 print(f"{cls.name:5} 失敗：{type(e).__name__}: {e}")
 
 
+# 診斷用：確認中職官網是不是只擋海外連線，以及野球革命（Rebas）的公開資料能不能當備用來源
+DIAG_URLS = [
+    "https://www.cpbl.com.tw/",
+    "https://www.cpbl.com.tw/schedule/index",
+    "https://cpbl.com.tw/schedule",
+    "https://www.rebas.tw/api/seasons/CPBL-2026-oB/games",
+]
+
+
+async def _diagnose(out: Path):
+    raw_dir = out / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    async with make_client() as client:
+        for i, url in enumerate(DIAG_URLS, 1):
+            try:
+                r = await client.get(url)
+                print(f"  {r.status_code}  {url}  ({len(r.content)} bytes)")
+                (raw_dir / f"diag{i:02d}.txt").write_text(f"GET {url}\nHTTP {r.status_code}\n\n{r.text}", encoding="utf-8")
+            except Exception as e:
+                print(f"  失敗  {url}  {type(e).__name__}: {e}")
+
+
 def cmd_probe(a):
     cfg = Config.load(a.config)
     day = date.fromisoformat(a.date) if a.date else datetime.now(cfg.tz).date()
     asyncio.run(_probe(cfg, a.leagues, day, Path(a.out)))
+    if a.diagnose:
+        print("診斷：")
+        asyncio.run(_diagnose(Path(a.out)))
 
 
 def main():
@@ -118,6 +143,7 @@ def main():
     pr.add_argument("leagues", nargs="*", help="cpbl mlb nba tpbl plg，不填代表全部")
     pr.add_argument("--date", help="YYYY-MM-DD，預設今天")
     pr.add_argument("--out", default="probe")
+    pr.add_argument("--diagnose", action="store_true", help="另外測試幾個備用網址")
     pr.set_defaults(fn=cmd_probe)
 
     a = ap.parse_args()

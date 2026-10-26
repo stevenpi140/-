@@ -38,16 +38,20 @@ class PLG:
         if time.time() - self._at < 600 and self._rows:
             return self._rows
         rows: list[dict] = []
-        errors: list[Exception] = []
+        statuses: list[str] = []
         for p in PAGES:
             try:
                 r = await client.get(BASE + p)
-                if r.status_code == 200:
-                    rows += parse_schedule(r.text)
             except httpx.HTTPError as e:  # 季後賽頁面不一定存在，個別失敗沒關係
-                errors.append(e)
-        if len(errors) == len(PAGES):
-            raise errors[0]
+                statuses.append(type(e).__name__)
+                continue
+            statuses.append(str(r.status_code))
+            if r.status_code == 200:
+                rows += parse_schedule(r.text)
+        if "200" not in statuses:
+            # 官網有 Cloudflare 機器人驗證，從某些網路（例如海外機房）連線會被擋成 403
+            hint = "，被官網的 Cloudflare 驗證擋住" if "403" in statuses else ""
+            raise RuntimeError(f"PLG 官網賽程頁都抓不到（HTTP {'/'.join(statuses)}{hint}）")
         self._rows, self._at = rows, time.time()
         return rows
 

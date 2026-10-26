@@ -50,9 +50,10 @@ jobs:
           cache-dependency-path: server/requirements.txt
       - run: sudo apt-get update && sudo apt-get install -y fonts-wqy-zenhei fonts-unifont
       - run: pip install -r requirements.txt
-      - name: 抓今天與昨天（台灣時間）的比賽
+      - name: 抓今天、昨天與上週末（台灣時間）的比賽
         run: |
-          for d in $(TZ=Asia/Taipei date +%F) $(TZ=Asia/Taipei date -d yesterday +%F); do
+          python -m scoreboard probe --out probe/today --diagnose || true
+          for d in $(TZ=Asia/Taipei date -d yesterday +%F) $(TZ=Asia/Taipei date -d 'last saturday' +%F) $(TZ=Asia/Taipei date -d 'last sunday' +%F); do
             echo "################ $d ################"
             python -m scoreboard probe --date "$d" --out "probe/$d" || true
           done

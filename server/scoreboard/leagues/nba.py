@@ -70,14 +70,17 @@ def parse(data: dict, cfg: Config, day: date) -> list[Game]:
                 num = h.split("Game")[-1].strip().split(" ")[0]
                 if num.isdigit():
                     label += f"G{num}"
+        away, home = _side(sides["away"]), _side(sides["home"])
+        if state == "pre":
+            away.score = home.score = None
         games.append(
             Game(
                 league="NBA",
                 id=str(ev.get("id")),
                 start=start,
                 state=state,  # type: ignore[arg-type]
-                away=_side(sides["away"]),
-                home=_side(sides["home"]),
+                away=away,
+                home=home,
                 venue=(comp.get("venue") or {}).get("fullName", ""),
                 label=label,
                 period=to_int(st.get("period")) or None,

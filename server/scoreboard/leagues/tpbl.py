@@ -82,7 +82,7 @@ def parse(rows: list[dict], cfg: Config, day: date) -> list[Game]:
         status = str(x.get("status", "")).upper()
         if status == "COMPLETED":
             state = "final"
-        elif status in LIVE_STATUS:
+        elif x.get("is_live") or status in LIVE_STATUS:
             state = "live"
         elif status in POSTPONED_STATUS:
             state = "postponed"
