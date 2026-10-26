@@ -34,3 +34,11 @@
 #define PIN_BTN_NEXT -1
 #define PIN_BTN_PAUSE -1
 #endif
+
+// ===== OTA 無線更新 =====
+// 密碼在 platformio.ini 的 [ota] password 設定；這裡只是沒透過 PlatformIO 編譯時的備用值
+#ifndef OTA_PASSWORD
+#define OTA_PASSWORD "scoreboard"
+#endif
+// 區網名稱：scoreboard.local
+#define OTA_HOSTNAME "scoreboard"

@@ -148,10 +148,27 @@ sudo systemctl enable --now scoreboard
 ### 2. 韌體（ESP32）
 
 1. 安裝 [VS Code + PlatformIO](https://platformio.org/install/ide?install=vscode)。
-2. 打開 `firmware/` 資料夾。面板尺寸不同的話，先改 `include/config.h`。
-3. 用 USB-C 接上 Trinity，執行 `pio run -e trinity -t upload`。一般 ESP32 用 `-e esp32dev`，MatrixPortal S3 用 `-e matrixportal_s3`。
+2. 打開 `firmware/` 資料夾。面板尺寸不同的話，先改 `include/config.h`。順便把 `platformio.ini` 裡 `[ota]` 的 `password` 改成你自己的無線更新密碼。
+3. 用 USB-C 接上驅動板燒錄：
+   - 微雪 ESP32-S3-RGB-Matrix：`pio run -e waveshare_s3 -t upload`（按住 BOOT 再插 USB-C，放開後上傳，完成後按 RESET）
+   - Trinity：`-e trinity`；一般 ESP32：`-e esp32dev`；MatrixPortal S3：`-e matrixportal_s3`
 4. 第一次開機時，面板會顯示 `Scoreboard-XXXX`。用手機連上這個 WiFi，在跳出的頁面選擇家裡的 WiFi，並填入**伺服器網址**（例如 `http://192.168.1.100:8080`）。
 5. 之後想重新設定，就在開機時按住 **BOOT** 鍵。
+
+### 3. 無線更新韌體（OTA）
+
+第一次用 USB 燒錄之後，看板掛上牆就不用再拆下來，之後可以直接透過 WiFi 更新韌體：
+
+```bash
+pio run -e waveshare_s3_ota -t upload    # 其他板子：trinity_ota / esp32dev_ota / matrixportal_s3_ota
+```
+
+- 電腦和看板要在同一個 WiFi 網路。
+- 更新時面板會顯示 `OTA UPDATE` 和進度條，完成後自動重新開機。
+- 預設用 `scoreboard.local` 找到看板。Windows 有時候找不到，這時把 `platformio.ini` 的 `[ota] host` 改成看板開機時顯示的 IP（`WiFi OK` 下面那行）。建議在路由器設定裡幫看板固定一個 IP。
+- 面板顯示 `OTA FAIL wrong password`：表示 `platformio.ini` 的密碼和看板上的不一樣。改密碼之後，要先用 USB 燒錄一次，新密碼才會生效。
+- 分割表（Flash 的空間配置）只能用 USB 改。我已經幫 OTA 預留好兩份韌體的空間，第一次 USB 燒錄時就會寫進去。
+- 版面、球隊、資料來源都在伺服器端處理，改這些**完全不用更新韌體**。只有改到 `firmware/` 裡的程式才需要 OTA。
 
 如果用 MatrixPortal S3，板上的 **UP** 鍵可以切到下一頁，**DOWN** 鍵可以暫停輪播、固定顯示目前這場（比分仍會持續更新）。
 

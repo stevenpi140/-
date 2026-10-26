@@ -2,6 +2,7 @@
 // 中文字型與版面都在伺服器處理，這裡只負責連網、抓圖、畫圖、換頁。
 
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <HTTPClient.h>
 #include <Preferences.h>
@@ -136,6 +137,52 @@ static void setupWifi() {
   delay(800);
 }
 
+// ---------- OTA 無線更新 ----------
+
+static void drawOtaProgress(unsigned int done, unsigned int total) {
+  static int lastPct = -1;
+  int pct = total ? (int)((uint64_t)done * 100 / total) : 0;
+  if (pct == lastPct) return;
+  lastPct = pct;
+  char line[16];
+  snprintf(line, sizeof(line), "%d%%", pct);
+  display->clearScreen();
+  display->setTextColor(0x07FF);
+  display->setCursor(2, 2);
+  display->print("OTA UPDATE");
+  display->setTextColor(0xFFFF);
+  display->setCursor(2, 14);
+  display->print(line);
+  // 進度條
+  const int x = 2, y = 30, w = FRAME_W - 4, h = 6;
+  display->drawRect(x, y, w, h, 0x8410);
+  display->fillRect(x + 1, y + 1, (w - 2) * pct / 100, h - 2, 0x07E0);
+  display->flipDMABuffer();
+}
+
+static void setupOta() {
+  ArduinoOTA.setHostname(OTA_HOSTNAME);
+  ArduinoOTA.setPassword(OTA_PASSWORD);
+  ArduinoOTA.onStart([]() {
+    Serial.println("OTA start");
+    drawOtaProgress(0, 1);
+  });
+  ArduinoOTA.onProgress(drawOtaProgress);
+  ArduinoOTA.onEnd([]() { showText("OTA DONE", "rebooting...", 0x07E0); });
+  ArduinoOTA.onError([](ota_error_t err) {
+    const char *msg = err == OTA_AUTH_ERROR      ? "wrong password"
+                      : err == OTA_BEGIN_ERROR   ? "begin failed"
+                      : err == OTA_CONNECT_ERROR ? "connect failed"
+                      : err == OTA_RECEIVE_ERROR ? "receive failed"
+                                                 : "end failed";
+    Serial.printf("OTA error %u: %s\n", err, msg);
+    showText("OTA FAIL", msg, 0xF800);
+    holdUntil = millis() + 5000;  // 錯誤訊息停 5 秒再回到比分畫面
+  });
+  ArduinoOTA.begin();
+  Serial.printf("OTA ready: %s.local (%s)\n", OTA_HOSTNAME, WiFi.localIP().toString().c_str());
+}
+
 // ---------- 網路 ----------
 
 // 抓第 p 頁畫面到 frame[]，成功回傳 true，並更新總頁數 / 停留時間 / 亮度
@@ -205,12 +252,16 @@ void setup() {
   showText("SCOREBOARD", "booting...");
   loadSettings();
   setupWifi();
+  WiFi.setSleep(false);  // 關掉 WiFi 省電模式，抓畫面和無線更新都比較穩
+  setupOta();
   if (PIN_BTN_NEXT >= 0) pinMode(PIN_BTN_NEXT, INPUT_PULLUP);
   if (PIN_BTN_PAUSE >= 0) pinMode(PIN_BTN_PAUSE, INPUT_PULLUP);
   Serial.printf("server: %s\n", serverUrl);
 }
 
 void loop() {
+  ArduinoOTA.handle();  // 隨時接受無線更新
+
   if (pressed(PIN_BTN_NEXT)) {
     page = (page + 1) % pageCount;
     holdUntil = 0;
