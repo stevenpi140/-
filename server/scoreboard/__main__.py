@@ -78,27 +78,55 @@ async def _probe(cfg: Config, which: list[str], day: date, out: Path):
                 continue
             lg = cls()
             try:
-                if cls.key == "cpbl":
-                    raw = await lg.fetch_raw(client, day)
-                    (out / "cpbl_raw.json").write_text(json.dumps(raw, ensure_ascii=False, indent=1), encoding="utf-8")
                 games = await lg.fetch(client, cfg, day)
                 (out / f"{cls.key}_games.json").write_text(
                     json.dumps([g.to_dict() for g in games], ensure_ascii=False, indent=1), encoding="utf-8"
                 )
                 print(f"{cls.name:5} OK，{len(games)} 場")
                 for g in games:
-                    print(f"      {g.start:%H:%M} {g.away.name} {g.away.score} - {g.home.score} {g.home.name}  [{g.status_text()}]")
+                    print(f"      {g.start:%H:%M} {g.away.name} {g.away.score} - {g.home.score} {g.home.name}"
+                          f"  [{g.status_text()}] 原始狀態={g.detail} {g.label}")
             except Exception as e:
                 print(f"{cls.name:5} 失敗：{type(e).__name__}: {e}")
 
 
-# 診斷用：確認中職官網是不是只擋海外連線，以及野球革命（Rebas）的公開資料能不能當備用來源
+# 診斷用：找出中職官網現在的賽程網址，以及野球革命（Rebas）有哪些賽季代碼（季後賽、總冠軍賽）
 DIAG_URLS = [
     "https://www.cpbl.com.tw/",
-    "https://www.cpbl.com.tw/schedule/index",
-    "https://cpbl.com.tw/schedule",
     "https://www.rebas.tw/api/seasons/CPBL-2026-oB/games",
+    "https://www.rebas.tw/api/leagues/CPBL/seasons",
+    "https://www.rebas.tw/api/seasons?league=CPBL",
+    "https://www.rebas.tw/league/CPBL",
 ]
+
+
+def _summarize(url: str, r) -> None:
+    import re
+    from collections import Counter
+
+    if "cpbl.com.tw" in url and r.status_code == 200:
+        links = sorted(set(re.findall(r'href="(/[^"#?]*(?:schedule|game|box|standing)[^"]*)"', r.text, re.I)))
+        print("    官網連結：", links[:40])
+    if "rebas.tw" in url and r.status_code == 200:
+        seasons = sorted(set(re.findall(r"CPBL-\d{4}-[A-Za-z0-9]+", r.text)))
+        print("    出現的賽季代碼：", seasons[:40])
+        try:
+            data = r.json()
+        except ValueError:
+            return
+        rows = data.get("data") if isinstance(data, dict) else data
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and "info" in rows[0]:
+            info = [x.get("info", {}) for x in rows]
+            print("    比賽數：", len(rows))
+            print("    status：", Counter(i.get("status") for i in info))
+            print("    finished_status：", Counter(i.get("finished_status") for i in info))
+            print("    group：", Counter(x.get("group") for x in rows))
+            dates = sorted(str(i.get("scheduled_start_at")) for i in info)
+            print("    日期範圍：", dates[0], "~", dates[-1])
+            sp = [x["away"].get("scheduled_SP") for x in rows if x.get("away", {}).get("scheduled_SP")]
+            print("    scheduled_SP 範例：", sp[:2])
+        elif isinstance(rows, (list, dict)):
+            print("    內容開頭：", str(rows)[:600])
 
 
 async def _diagnose(out: Path):
@@ -110,6 +138,7 @@ async def _diagnose(out: Path):
                 r = await client.get(url)
                 print(f"  {r.status_code}  {url}  ({len(r.content)} bytes)")
                 (raw_dir / f"diag{i:02d}.txt").write_text(f"GET {url}\nHTTP {r.status_code}\n\n{r.text}", encoding="utf-8")
+                _summarize(url, r)
             except Exception as e:
                 print(f"  失敗  {url}  {type(e).__name__}: {e}")
 

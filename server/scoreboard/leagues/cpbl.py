@@ -1,6 +1,8 @@
-"""中華職棒：官網 www.cpbl.com.tw 內部使用的 AJAX 介面（非公開 API，官網改版可能失效）。
+"""中華職棒。
 
-流程：
+主要來源是野球革命 Rebas 的公開 JSON（見 rebas.py），抓不到時才改用中職官網。
+
+官網 www.cpbl.com.tw 內部使用的 AJAX 介面（非公開 API，官網改版可能失效）流程：
 1. GET /schedule 取得 cookie 與頁面裡的 RequestVerificationToken
 2. POST /schedule/getgamedatas（calendar=YYYY/MM/01, kindCode=A/E/C/G）取得當月賽程與比分
 3. 比賽進行中時，POST /box/getlive 取得局數（盡力而為，失敗就只顯示比分）
@@ -21,6 +23,7 @@ from ..config import Config
 from ..models import Game, TeamLine
 from ..teams import CPBL_TEAMS, match_tw_team
 from .base import parse_iso, to_int
+from .rebas import Rebas
 
 BASE = "https://www.cpbl.com.tw"
 # A 例行賽、E 季後挑戰賽、C 總冠軍賽、G 熱身賽
@@ -64,6 +67,7 @@ class CPBL:
 
     def __init__(self):
         self._token: str | None = None
+        self.rebas = Rebas()
 
     async def _get_token(self, client: httpx.AsyncClient, path: str = "/schedule") -> str:
         r = await client.get(BASE + path)
@@ -104,6 +108,16 @@ class CPBL:
         return out
 
     async def fetch(self, client: httpx.AsyncClient, cfg: Config, day: date) -> list[Game]:
+        try:
+            return await self.rebas.fetch(client, cfg, day)
+        except Exception as e:  # 野球革命抓不到時改用官網
+            rebas_error = e
+        try:
+            return await self.fetch_official(client, cfg, day)
+        except Exception as e:
+            raise RuntimeError(f"野球革命：{type(rebas_error).__name__}: {rebas_error}；官網：{type(e).__name__}: {e}") from e
+
+    async def fetch_official(self, client: httpx.AsyncClient, cfg: Config, day: date) -> list[Game]:
         raw = await self.fetch_raw(client, day)
         games: list[Game] = []
         for kind, rows in raw.items():

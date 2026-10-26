@@ -156,3 +156,42 @@ def test_follow_filter():
     assert not cfg.follows("mlb", "NYY", "洋基")
     assert cfg.follows("cpbl", "CTBC", "中信", "中信兄弟")
     assert cfg.follows("nba", "BOS")  # 空清單 = 全部
+
+
+def test_rebas_cpbl():
+    from scoreboard.leagues import rebas
+
+    rows = [
+        {
+            "uniqid": "A1", "group": "例行賽",
+            "away": {"team": "富邦悍將", "runs": 6, "scores": ["5", "0", "1"], "scheduled_SP": None},
+            "home": {"team": "樂天桃猿", "runs": 1, "scores": ["0", "0"], "scheduled_SP": None},
+            "info": {"status": "PLAYING", "finished_status": "NORMAL", "scheduled_start_at": "2026-10-26 18:35",
+                     "started_at": "2026-10-26 18:35", "ended_at": "", "location_abbr": "樂天桃園", "innings": 3},
+        },
+        {
+            "uniqid": "A2", "group": "總冠軍賽",
+            "away": {"team": "中信兄弟", "runs": 0, "scores": [], "scheduled_SP": "勝騎士"},
+            "home": {"team": "味全龍", "runs": 0, "scores": [], "scheduled_SP": "梅賽德"},
+            "info": {"status": "NOT_STARTED", "finished_status": "NORMAL", "scheduled_start_at": "2026-10-26 18:35",
+                     "started_at": "", "ended_at": ""},
+        },
+        {"uniqid": "A3", "away": {}, "home": {}, "info": {"scheduled_start_at": "2026-10-25 18:35"}},
+    ]
+    games = rebas.parse(rows, CFG, DAY)
+    assert len(games) == 2
+    live, pre = games
+    assert live.state == "live" and live.status_text() == "3局上"
+    assert (live.away.name, live.away.score, live.home.name, live.home.score) == ("富邦", 6, "樂天", 1)
+    assert live.venue == "樂天桃園" and live.label == ""
+    assert pre.state == "pre" and pre.away.score is None
+    assert pre.away.pitcher == "勝騎士" and pre.label == "總冠軍賽"
+
+
+def test_tpbl_completed_without_status_update():
+    rows = [{
+        "id": 1, "game_date": "2026-10-24", "game_time": "14:30:00", "status": "SCHEDULED", "is_live": False,
+        "home_team": {"name": "新竹御嵿攻城獅", "won_score": 100}, "away_team": {"name": "福爾摩沙夢想家", "won_score": 90},
+    }]
+    g = tpbl.parse(rows, CFG, date(2026, 10, 24))[0]
+    assert g.state == "final" and g.home.score == 100

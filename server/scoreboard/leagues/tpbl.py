@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import httpx
 
@@ -20,6 +20,7 @@ from .base import to_int
 API = "https://api.tpbl.basketball/api"
 LIVE_STATUS = {"IN_PROGRESS", "LIVE", "PLAYING", "STARTED", "ONGOING"}
 POSTPONED_STATUS = {"POSTPONED", "CANCELLED", "CANCELED", "SUSPENDED"}
+GAME_LENGTH = timedelta(hours=2, minutes=30)
 
 
 class TPBL:
@@ -89,6 +90,10 @@ def parse(rows: list[dict], cfg: Config, day: date) -> list[Game]:
         else:
             state = "pre"
         away, home = _team(x.get("away_team") or {}, cfg), _team(x.get("home_team") or {}, cfg)
+        # 有些已打完的比賽 status 還沒更新成 COMPLETED：有比分且開打超過 2.5 小時就當作終場
+        has_score = (away.score or 0) + (home.score or 0) > 0
+        if state == "pre" and has_score and datetime.now(tz) >= start + GAME_LENGTH:
+            state = "final"
         if state == "pre":
             away.score = home.score = None
         out.append(
