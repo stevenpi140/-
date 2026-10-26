@@ -37,13 +37,9 @@ class Aggregator:
     def today(self):
         return datetime.now(self.cfg.tz).date()
 
-    def active_states(self, day=None) -> list[LeagueState]:
-        """只回傳目前季節要顯示的聯盟（例如籃球季只有 NBA / TPBL / PLG）。"""
-        day = day or self.today()
-        return [s for s in self.states if self.cfg.league_active(s.league.key, day)]
-
-    def games(self, day=None) -> list[Game]:
-        out = [g for s in self.active_states(day) for g in s.games]
+    def games(self) -> list[Game]:
+        # 沒有比賽的聯盟就不會出現在輪播裡，不用另外判斷季節
+        out = [g for s in self.states for g in s.games]
         # 固定用開打時間排序，不因比賽狀態改變而重排，這樣輪播一圈每一場都一定會輪到
         out.sort(key=lambda g: (g.start, g.league, g.id))
         return out
@@ -79,7 +75,7 @@ class Aggregator:
         self.updated_at = time.time()
 
     async def refresh_all(self, client: httpx.AsyncClient, day=None):
-        await asyncio.gather(*(self.refresh(client, s, day) for s in self.active_states(day)))
+        await asyncio.gather(*(self.refresh(client, s, day) for s in self.states))
 
     async def run(self):
         day = self.today()
@@ -89,8 +85,7 @@ class Aggregator:
                     day = self.today()
                     for s in self.states:
                         s.games, s.next_due = [], 0
-                # 非當季的聯盟不抓資料，省下請求
-                due = [s for s in self.active_states() if time.time() >= s.next_due]
+                due = [s for s in self.states if time.time() >= s.next_due]
                 if due:
                     await asyncio.gather(*(self.refresh(client, s) for s in due))
                 await asyncio.sleep(2)
@@ -99,11 +94,9 @@ class Aggregator:
         self._task = asyncio.create_task(self.run())
 
     def status(self) -> list[dict]:
-        active = {id(s) for s in self.active_states()}
         return [
             {
                 "league": s.league.name,
-                "in_season": id(s) in active,
                 "games": len(s.games),
                 "last_ok": s.last_ok,
                 "error": s.error,

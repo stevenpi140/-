@@ -33,12 +33,9 @@ async def _real_games(cfg: Config, day: date | None):
     agg = Aggregator(cfg)
     async with make_client() as client:
         await agg.refresh_all(client, day)
-    day = day or agg.today()
-    sports = "、".join({"baseball": "棒球", "basketball": "籃球"}[x] for x in cfg.active_sports(day))
-    print(f"  {day} 季節：{sports}")
-    for s in agg.active_states(day):
+    for s in agg.states:
         print(f"  {s.league.name:5} {len(s.games)} 場 {('錯誤：' + s.error) if s.error else ''}")
-    return agg.games(day)
+    return agg.games()
 
 
 def cmd_preview(a):
