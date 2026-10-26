@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -24,8 +25,31 @@ DEFAULTS = {
         "tpbl": {"enabled": True, "teams": []},
         "plg": {"enabled": True, "teams": []},
     },
+    # 依季節決定顯示哪一類運動。兩季重疊的期間才會全部一起輪播。
+    "season": {
+        "mode": "auto",  # auto = 依日期自動切換；也可以固定成 basketball / baseball / all
+        "baseball": ["03-01", "10-15"],  # 月-日，含頭尾
+        "basketball": ["10-01", "06-30"],  # 跨年：10/1 到隔年 6/30
+    },
     "aliases": {},
 }
+
+SPORTS = {
+    "baseball": ("cpbl", "mlb"),
+    "basketball": ("nba", "tpbl", "plg"),
+}
+
+
+def _md(s: str) -> tuple[int, int]:
+    m, d = s.split("-")
+    return int(m), int(d)
+
+
+def in_window(day: date, window) -> bool:
+    start, end, md = _md(window[0]), _md(window[1]), (day.month, day.day)
+    if start <= end:
+        return start <= md <= end
+    return md >= start or md <= end  # 跨年的區間
 
 
 def _merge(base: dict, over: dict) -> dict:
@@ -60,6 +84,20 @@ class Config:
     @property
     def aliases(self) -> dict[str, str]:
         return self.raw.get("aliases") or {}
+
+    def active_sports(self, day: date) -> list[str]:
+        """今天要顯示的運動：baseball / basketball，重疊期間兩個都有。"""
+        season = self.raw["season"]
+        mode = season.get("mode", "auto")
+        if mode in SPORTS:
+            return [mode]
+        if mode == "all":
+            return list(SPORTS)
+        active = [sport for sport in SPORTS if in_window(day, season[sport])]
+        return active or list(SPORTS)  # 兩季都沒涵蓋到的日子就全部顯示，避免整天空白
+
+    def league_active(self, key: str, day: date) -> bool:
+        return any(key in SPORTS[s] for s in self.active_sports(day))
 
     def league(self, key: str) -> dict:
         return self.raw["leagues"].get(key, {"enabled": False})

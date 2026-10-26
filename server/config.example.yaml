@@ -21,7 +21,16 @@ poll:
   soon_seconds: 60    # 30 分鐘內有比賽要開打
   idle_seconds: 600   # 其他時間
 
-# teams 留空 [] = 該聯盟全部比賽都顯示
+# 依季節自動切換顯示的運動
+#   籃球季（預設 10/1 ~ 隔年 6/30）：只輪播 NBA、TPBL、PLG
+#   棒球季（預設 3/1 ~ 10/15）：只輪播中職、MLB
+#   兩季重疊的期間（3/1 ~ 6/30、10/1 ~ 10/15）：全部一起輪播
+season:
+  mode: auto                  # auto 自動；也可以固定成 basketball / baseball / all
+  baseball: ["03-01", "10-15"]
+  basketball: ["10-01", "06-30"]
+
+# teams 留空 [] = 該聯盟全部比賽都顯示（每一場都會輪播到）
 # 可以填英文縮寫（MLB/NBA）或中文隊名關鍵字（台灣聯盟）
 leagues:
   cpbl:
@@ -29,10 +38,10 @@ leagues:
     teams: []                 # 例：[中信, 味全]
   mlb:
     enabled: true
-    teams: [LAD, NYY]         # 例：道奇、洋基。縮寫見 scoreboard/teams.py
+    teams: []                 # 例：[LAD, NYY] 道奇、洋基。縮寫見 scoreboard/teams.py
   nba:
     enabled: true
-    teams: [GSW, LAL]         # 例：勇士、湖人
+    teams: []                 # 例：[GSW, LAL] 勇士、湖人
   tpbl:
     enabled: true
     teams: []                 # 例：[國王, 戰神]

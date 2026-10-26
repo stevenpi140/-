@@ -42,7 +42,8 @@ def _pages():
     now = datetime.now(cfg.tz)
     games = agg.games()
     note = ""
-    if not games and agg.states and all(s.error and not s.last_ok for s in agg.states):
+    active = agg.active_states()
+    if not games and active and all(s.error and not s.last_ok for s in active):
         note = "資料來源連線失敗"
     return now, games, playlist.build(renderer, cfg, games, now, note)
 
@@ -98,7 +99,15 @@ def api_games():
 
 @app.get("/api/status")
 def api_status():
-    return {"updated_at": agg.updated_at, "leagues": agg.status()}
+    _, games, pages = _pages()
+    return {
+        "updated_at": agg.updated_at,
+        "season": cfg.active_sports(agg.today()),
+        "games": len(games),
+        "pages": len(pages),
+        "cycle_seconds": sum(p.hold_ms for p in pages) // 1000,  # 輪播一圈多久，每一場都會在這段時間內出現一次
+        "leagues": agg.status(),
+    }
 
 
 @app.post("/api/refresh")

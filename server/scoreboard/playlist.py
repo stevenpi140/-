@@ -15,14 +15,18 @@ def build(r: Renderer, cfg: Config, games: list[Game], now: datetime, note: str 
     live_hold = int(disp["live_page_seconds"] * 1000)
     if not games:
         return [Page("idle", 15000, r.idle(now, note))]
+    if len(games) == 1:
+        g = games[0]
+        return [Page("game", live_hold if g.state == "live" else hold, r.game(g, now))]
+    # 總覽頁和單場頁穿插：總覽(1-4) → 第1-4場 → 總覽(5-8) → 第5-8場 ...
+    # 每一圈每一場都會輪到一次，比賽再多也不會漏掉
     pages: list[Page] = []
-    if len(games) > 1:
-        n = r.overview_rows
-        chunks = [games[i : i + n] for i in range(0, len(games), n)]
-        for i, c in enumerate(chunks):
-            pages.append(Page("overview", hold, r.overview(c, now, i + 1, len(chunks))))
-    for g in games:
-        pages.append(Page("game", live_hold if g.state == "live" else hold, r.game(g, now)))
+    n = r.overview_rows
+    chunks = [games[i : i + n] for i in range(0, len(games), n)]
+    for i, chunk in enumerate(chunks):
+        pages.append(Page("overview", hold, r.overview(chunk, now, i + 1, len(chunks))))
+        for g in chunk:
+            pages.append(Page("game", live_hold if g.state == "live" else hold, r.game(g, now)))
     return pages
 
 
