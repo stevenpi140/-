@@ -10,7 +10,7 @@
 
 ```
  ┌──────────── 伺服器（樹莓派／家裡電腦／NAS，常開） ────────────┐
- │  抓資料：中職官網、MLB Stats API、ESPN(NBA)、TPBL API、PLG 官網  │
+ │  抓資料：野球革命(中職)、MLB Stats API、ESPN(NBA)、TPBL API、PLG 官網  │
  │  整理成統一格式 → 依追蹤清單篩選 → 用點陣中文字型畫成 128×64 圖 │
  │  GET /frame?page=N  → 16KB RGB565 原始畫面                       │
  └───────────────────────────────┬──────────────────────────────────┘
@@ -218,13 +218,17 @@ pio run -e waveshare_s3_ota -t upload    # 其他板子：trinity_ota / esp32dev
 |---|---|---|
 | MLB | `statsapi.mlb.com`（MLB 官方 Stats API） | 高，免金鑰 |
 | NBA | ESPN `site.api.espn.com` scoreboard | 高，非官方但已經用了很多年 |
-| 中職 | 中職官網 `cpbl.com.tw` 的 `/schedule/getgamedatas`、`/box/getlive` | 中，非公開介面，需要 token |
+| 中職 | 主要：野球革命 Rebas `rebas.tw/api`（自動找出當天的例行賽／季後挑戰賽／台灣大賽賽季）；備援：中職官網 `cpbl.com.tw` | 中，網站前端使用的 JSON，未公開文件化 |
 | TPBL | `api.tpbl.basketball`（官網前端使用的 API） | 中，未公開文件化 |
 | PLG | `pleagueofficial.com` 賽程頁 HTML ＋ `/api/boxscore.preciser.php` | 中低，解析 HTML，官網改版就要調整 |
 
 所有來源都是公開網頁背後的資料，請保持合理的更新頻率（預設比賽中 15 秒、平時 10 分鐘），不要調得太頻繁。
 
-> ⚠️ **中職、TPBL、PLG 的解析器還沒有連到真實網站驗證過。** 開發環境連不到這些網站，欄位名稱是參考社群開源專案的整理寫的。第一次使用時請先跑 `python -m scoreboard probe`，如果某個聯盟抓不到或欄位不對，`probe/` 資料夾裡的原始回應可以拿來修正 `server/scoreboard/leagues/` 底下對應的檔案。MLB 和 NBA 用的是格式穩定、文件齊全的 API。
+> ✅ MLB、NBA、TPBL、中職（野球革命）都已經在 GitHub Actions 上用真實資料驗證過。
+>
+> ⚠️ **PLG 官網有 Cloudflare 驗證**，從雲端主機連會被擋（HTTP 403）。請在家裡的網路跑 `python -m scoreboard probe plg` 確認；如果家裡也被擋，PLG 只能先關閉（`leagues.plg.enabled: false`）。本專案不會去繞過網站的機器人驗證。
+>
+> 任何聯盟抓不到或欄位不對時，跑 `python -m scoreboard probe`，`probe/raw/` 裡的原始回應可以拿來修正 `server/scoreboard/leagues/` 底下對應的檔案。
 
 ## 測試
 

@@ -27,6 +27,7 @@ leagues:
   cpbl:
     enabled: true
     teams: []                 # 例：[中信, 味全]
+    # rebas_seasons: [CPBL-2026-LU]   # 通常不用填：會自動從野球革命找出當天的賽季（例行賽、季後挑戰賽、台灣大賽）
   mlb:
     enabled: true
     teams: []                 # 例：[LAD, NYY] 道奇、洋基。縮寫見 scoreboard/teams.py

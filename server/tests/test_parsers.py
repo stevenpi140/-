@@ -195,3 +195,19 @@ def test_tpbl_completed_without_status_update():
     }]
     g = tpbl.parse(rows, CFG, date(2026, 10, 24))[0]
     assert g.state == "final" and g.home.score == 100
+
+
+def test_rebas_picks_seasons_covering_day():
+    from scoreboard.leagues import rebas
+
+    seasons = [
+        {"uniqid": "CPBL-2026-LU", "type": "POSTSEASON", "start_at": "2026-10-17T00:00:00+08:00",
+         "end_at": "2026-10-28T00:00:00+08:00"},
+        {"uniqid": "CPBL-2026-YQ", "type": "CHALLENGE", "start_at": "2026-10-09T00:00:00+08:00",
+         "end_at": "2026-10-13T00:00:00+08:00"},
+        {"uniqid": "CPBL-2026-oB", "type": "REGULAR", "start_at": "2026-03-28T00:00:00+08:00",
+         "end_at": "2026-10-07T00:00:00+08:00"},
+    ]
+    assert rebas.seasons_for(seasons, DAY) == ["CPBL-2026-LU"]
+    assert rebas.seasons_for(seasons, date(2026, 10, 8)) == ["CPBL-2026-YQ", "CPBL-2026-oB"]
+    assert rebas.seasons_for(seasons, date(2026, 12, 1)) == []  # 休賽季：沒有比賽
