@@ -31,7 +31,7 @@ static void setupDisplay() {
   // R1, G1, B1, R2, G2, B2, A, B, C, D, E, LAT, OE, CLK
   cfg.gpio = {42, 41, 40, 38, 39, 37, 45, 36, 48, 35, 21, 47, 14, 2};
 #else
-  // 一般 ESP32 使用函式庫預設腳位（與 ESP32 Trinity 相同），E 腳接 GPIO 18
+  // ESP32 Trinity／一般 ESP32：函式庫預設腳位，64x64 面板的 E 腳接 GPIO 18（Trinity 官方範例同設定）
   cfg.gpio.e = 18;
 #endif
 #ifdef PANEL_DRIVER_FM6126A
@@ -40,7 +40,14 @@ static void setupDisplay() {
   cfg.clkphase = PANEL_CLKPHASE;
   cfg.double_buff = true;  // 先畫在背景緩衝區再切換，換頁不會閃爍
   display = new MatrixPanel_I2S_DMA(cfg);
-  display->begin();
+  if (!display->begin()) {
+    // 一般 ESP32 只能用內部 RAM（約 200KB），128x64 雙緩衝放不下時改用單緩衝
+    Serial.println("double buffer alloc failed, fallback to single buffer");
+    delete display;
+    cfg.double_buff = false;
+    display = new MatrixPanel_I2S_DMA(cfg);
+    display->begin();
+  }
   display->setBrightness8(brightness);
   display->clearScreen();
   display->flipDMABuffer();
@@ -144,8 +151,8 @@ static bool fetchFrame(int p, uint32_t &holdMs) {
     return false;
   }
 
-  // 先讀到暫存區，完整收到才覆蓋，避免畫面只更新一半
-  static uint8_t buf[sizeof(frame)];
+  // 直接讀進 frame[]；只有完整收到才會呼叫 drawFrame()，所以讀到一半失敗不會顯示殘缺畫面
+  uint8_t *buf = reinterpret_cast<uint8_t *>(frame);
   WiFiClient *stream = http.getStreamPtr();
   size_t got = 0;
   uint32_t t0 = millis();
@@ -161,7 +168,7 @@ static bool fetchFrame(int p, uint32_t &holdMs) {
     http.end();
     return false;
   }
-  memcpy(frame, buf, need);  // ESP32 是 little-endian，與伺服器輸出的 RGB565 位元組順序一致
+  // ESP32 是 little-endian，與伺服器輸出的 RGB565 位元組順序一致，不用再轉換
 
   pageCount = max(1L, http.header("X-Pages").toInt());
   holdMs = max(1000L, http.header("X-Hold-Ms").toInt());

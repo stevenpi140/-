@@ -16,7 +16,7 @@
  └───────────────────────────────┬──────────────────────────────────┘
                                  │ 區網 HTTP
  ┌───────────────────────────────▼──────────────────────────────────┐
- │  ESP32（MatrixPortal S3）→ HUB75 → 兩片 64×64 LED 面板（128×64） │
+ │  ESP32（Trinity）→ HUB75 → 兩片 64×64 LED 面板（128×64）        │
  └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -24,29 +24,37 @@
 
 ## 硬體清單
 
-| 項目 | 推薦規格 | 數量 | 參考價（NT$） | 備註 |
+> 價格是 2026 年 10 月查到的海外通路標價（美元），台幣只是概算，不含運費與關稅。台灣蝦皮／露天的賣場價格請自行比較。
+
+| 項目 | 推薦規格 | 數量 | 參考價 | 備註 |
 |---|---|---|---|---|
-| LED 點陣面板 | **P3 64×64 全彩 HUB75（HUB75E，1/32 掃）** | 2 | 每片 350–700 | 單片 19.2×19.2 cm，兩片並排成 **38.4×19.2 cm、128×64 點**。蝦皮／淘寶搜尋「P3 全彩 LED 模組 64x64 HUB75」 |
-| 控制板 | **Adafruit MatrixPortal S3**（ESP32-S3） | 1 | 700–900 | 直接插在面板的 HUB75 排針上，免接線；板上有兩顆按鍵 |
-| 電源 | 5V **8A 以上**變壓器（DC 5.5mm 或電源供應器） | 1 | 300–500 | 一片 64×64 全白約 4A。看板大多是黑底，實際用電少很多，但仍要保留餘裕 |
-| 排線／電源線 | 面板通常會附 HUB75 排線＋電源線 | — | — | 兩片串接要用一條 HUB75 排線（第一片 OUT → 第二片 IN） |
-| 伺服器 | Raspberry Pi Zero 2 W／Pi 4，或任何常開的電腦 | 1 | 600–2000 | 開發階段先用自己的電腦就可以 |
-| 選配 | 壓克力黑色濾光板、3D 列印外殼、M3 磁鐵螺絲 | — | — | 黑色半透明壓克力蓋在面板前，畫面對比會好很多 |
+| LED 點陣面板 | **P3 64×64 全彩 HUB75E（1/32 掃描，室內型）** | 2 | Waveshare 官網 US$29.99／片；AliExpress 雜牌約 US$8–16 | 單片 19.2×19.2 cm，兩片並排是 **38.4×19.2 cm、128×64 點** |
+| 控制板 | **ESP32 Trinity**（Brian Lough 設計） | 1 | Tindie 原作者賣場 US$40；也可以找 Makerfabs 或 esp32s.com（US$46.90） | 直接插在面板背面，內建 DC 插孔和電源端子，是專為這個 LED 函式庫設計的板子 |
+| 電源 | **5V 8A 以上**、2.1mm DC 插頭的變壓器（筆電型） | 1 | 約 NT$300–500 | Trinity 官方建議用 5V 8A。一片 64×64 大約要 4A，兩片要 8A 以上 |
+| 排線／電源線 | 面板通常會附 HUB75 排線和電源線 | — | — | 兩片串接要用一條 HUB75 排線（第一片 OUT → 第二片 IN） |
+| 伺服器 | Raspberry Pi Zero 2 W／Pi 4，或任何一直開著的電腦 | 1 | — | 開發階段用自己的電腦就可以 |
+| 選配 | 黑色半透明壓克力板、3D 列印外殼、M3 磁鐵螺絲 | — | — | 壓克力蓋在面板前面，對比會好很多 |
+
+**買面板時要注意：**
+
+- 一定要選 **HUB75E**（有 E 位址線）、**1/32 掃描**的 64×64 面板。
+- 看賣場有沒有寫驅動晶片。這個 LED 函式庫測試過可以用的有 **FM6126A、FM6124、ICN2038S、ICND2012、RUC7258、SM5266P**；**不支援 ICN2053、FM6353 這類 S-PWM 晶片**，買到這種是不能用的。
+- 第一次買、不想踩雷的話，可以挑 **Waveshare 的 RGB-Matrix-P3-64x64**，品牌貨規格比較清楚。
+
+**為什麼不推薦 Adafruit MatrixPortal S3？** 它本來是最方便的選擇，但這個專案用的 LED 函式庫（ESP32-HUB75-MatrixPanel-DMA），作者在說明裡寫了「MatrixPortal S3 搭配這個函式庫可能有 WiFi 干擾問題，需要 WiFi 的話不建議使用」。看板一定要靠 WiFi 抓比分，所以改推薦 Trinity。另外，MatrixPortal S3 目前在 Adafruit 官網和 DigiKey 都缺貨，DigiKey 標示的交期是 18 週。韌體還是保留了 `matrixportal_s3` 這個 env，已經有這塊板子的話也能用用看。
 
 **其他尺寸的面板：**
 
 - **P2.5 64×64**：一片 16×16 cm，兩片並排 32×16 cm，點距更細、更精緻。
 - **P4 64×32**：一片 25.6×12.8 cm，實體比較大，但兩片只有 128×32 點，中文只能排兩行。目前的版面是照 128×64 設計的，用 128×32 要另外調整 `render.py`。
 
-**不用 MatrixPortal 的話：** 也可以用一般 ESP32 DevKit 加杜邦線，或 Brian Lough 的 ESP32 Trinity 板，韌體請選 `esp32dev` 這個 env，腳位見下方說明。
-
 ### 接線
 
-1. 兩片面板背面箭頭朝同一個方向。左邊那片的 **HUB75 IN** 接 MatrixPortal，左邊的 **OUT** 用排線接右邊那片的 **IN**。
-2. 面板的電源線（紅 5V、黑 GND）接到 5V 變壓器。
-3. MatrixPortal S3 用 USB-C 供電，它和面板透過 HUB75 排線共地。
-4. **64×64 面板需要 E 位址線**：MatrixPortal S3 背面有「Address E」跳線焊點，要依 [Adafruit 的說明](https://learn.adafruit.com/adafruit-matrixportal-s3) 焊接，否則畫面只會亮一半或重複。
-5. 一般 ESP32 的接線用函式庫的預設腳位：R1 25、G1 26、B1 27、R2 14、G2 12、B2 13、A 23、B 19、C 5、D 17、**E 18**、LAT 4、OE 15、CLK 16。
+1. 兩片面板背面的箭頭要朝同一個方向。Trinity 插在左邊那片的 **HUB75 IN**，左邊那片的 **OUT** 再用排線接到右邊那片的 **IN**。
+2. 5V 變壓器插 Trinity 的 DC 插孔。兩片面板的電源線（紅 5V、黑 GND）接到 Trinity 的綠色電源端子。
+3. **64×64 面板需要 E 位址線**：Trinity 用的是 GPIO 18（和 Trinity 官方範例一樣），韌體已經設定好了。
+4. 一般 ESP32 DevKit 自己接線的話，用函式庫的預設腳位：R1 25、G1 26、B1 27、R2 14、G2 12、B2 13、A 23、B 19、C 5、D 17、**E 18**、LAT 4、OE 15、CLK 16。
+5. 如果用的是 MatrixPortal S3：背面的「Address E」跳線要焊到 **8**（Adafruit 自家面板）或 **16**（部分其他廠牌），依面板規格決定。另外，板子上的電源端子只能輸出，面板要另外接 5V 電源。
 
 ## 軟體
 
@@ -119,11 +127,11 @@ sudo systemctl enable --now scoreboard
 
 1. 安裝 [VS Code + PlatformIO](https://platformio.org/install/ide?install=vscode)。
 2. 打開 `firmware/` 資料夾。面板尺寸不同的話，先改 `include/config.h`。
-3. 接上 MatrixPortal S3，執行 `pio run -e matrixportal_s3 -t upload`（一般 ESP32 用 `-e esp32dev`）。
+3. 用 USB-C 接上 Trinity，執行 `pio run -e trinity -t upload`。一般 ESP32 用 `-e esp32dev`，MatrixPortal S3 用 `-e matrixportal_s3`。
 4. 第一次開機時，面板會顯示 `Scoreboard-XXXX`。用手機連上這個 WiFi，在跳出的頁面選擇家裡的 WiFi，並填入**伺服器網址**（例如 `http://192.168.1.100:8080`）。
 5. 之後想重新設定，就在開機時按住 **BOOT** 鍵。
 
-MatrixPortal S3 板上的按鍵：**UP** 切到下一頁，**DOWN** 暫停輪播，固定顯示目前這場（比分仍會持續更新）。
+如果用 MatrixPortal S3，板上的 **UP** 鍵可以切到下一頁，**DOWN** 鍵可以暫停輪播、固定顯示目前這場（比分仍會持續更新）。
 
 ## 畫面說明
 
@@ -159,7 +167,8 @@ cd server && python -m pytest -q
 
 | 狀況 | 處理 |
 |---|---|
-| 面板只亮一半、或上下重複 | 64×64 面板的 E 腳沒接好：MatrixPortal 要焊 Address E 跳線，一般 ESP32 要接 GPIO18 |
+| 面板只亮一半、或上下重複 | 64×64 面板的 E 腳沒接好：Trinity／一般 ESP32 要接 GPIO18，MatrixPortal 要焊 Address E 跳線（8 或 16） |
+| 開機時序列埠印出 `fallback to single buffer` | 一般 ESP32 的記憶體不夠開雙緩衝，已經自動改用單緩衝，換頁時可能會稍微閃一下，不影響使用 |
 | 開機全黑或花屏 | 打開 `config.h` 的 `PANEL_DRIVER_FM6126A` |
 | 顏色或左右錯位 | 切換 `PANEL_CLKPHASE` |
 | 面板顯示 `NO SERVER` | 確認伺服器網址、電腦防火牆有開 8080 埠，以及 ESP32 和伺服器在同一個網段 |
