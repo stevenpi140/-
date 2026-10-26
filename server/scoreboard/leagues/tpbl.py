@@ -92,9 +92,10 @@ def parse(rows: list[dict], cfg: Config, day: date) -> list[Game]:
         away, home = _team(x.get("away_team") or {}, cfg), _team(x.get("home_team") or {}, cfg)
         # 有些已打完的比賽 status 還沒更新成 COMPLETED：有比分且開打超過 2.5 小時就當作終場
         has_score = (away.score or 0) + (home.score or 0) > 0
-        if state == "pre" and has_score and datetime.now(tz) >= start + GAME_LENGTH:
-            state = "final"
-        if state == "pre":
+        if state == "pre" and datetime.now(tz) >= start + GAME_LENGTH:
+            # 颱風等原因延賽時 API 仍維持 NOT_STARTED：開打 2.5 小時後還完全沒有比分就當作延賽
+            state = "final" if has_score else "postponed"
+        if state in ("pre", "postponed"):
             away.score = home.score = None
         out.append(
             Game(

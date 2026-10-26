@@ -212,3 +212,14 @@ def test_rebas_picks_seasons_covering_day():
     assert rebas.seasons_for(seasons, DAY) == ["CPBL-2026-LU"]
     assert rebas.seasons_for(seasons, date(2026, 10, 8)) == ["CPBL-2026-YQ", "CPBL-2026-oB"]
     assert rebas.seasons_for(seasons, date(2026, 12, 1)) == []  # 休賽季：沒有比賽
+
+
+def test_tpbl_postponed_still_not_started():
+    # 2026-10-24 薔琵颱風延賽的兩場，API 一直維持 NOT_STARTED、沒有比分
+    rows = [{
+        "id": 27544, "game_date": "2026-10-24", "game_time": "14:30:00", "status": "NOT_STARTED", "is_live": False,
+        "home_team": {"name": "新竹御嵿攻城獅", "won_score": None}, "away_team": {"name": "福爾摩沙夢想家", "won_score": None},
+    }]
+    g = tpbl.parse(rows, CFG, date(2026, 10, 24))[0]
+    assert g.state == "postponed" and g.status_text() == "延賽"
+    assert g.home.score is None

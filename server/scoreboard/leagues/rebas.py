@@ -135,7 +135,7 @@ def parse(rows: list[dict], cfg: Config, day: date) -> list[Game]:
         lines = []
         for side in (away, home):
             code, short, color = match_tw_team(CPBL_TEAMS, str(side.get("team", "")), cfg.aliases)
-            score = to_int(side.get("runs")) if state != "pre" else None
+            score = to_int(side.get("runs")) if state in ("live", "final") else None
             lines.append(TeamLine(code, short, str(side.get("team", "")), color, score, _sp(side)))
         a_innings, h_innings = len(away.get("scores") or []), len(home.get("scores") or [])
         group = str(g.get("group") or "")

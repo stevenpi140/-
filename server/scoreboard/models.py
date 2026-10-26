@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Literal, Optional
@@ -58,7 +59,8 @@ class Game:
     def status_text(self) -> str:
         """給畫面用的狀態文字。"""
         if self.state == "postponed":
-            return self.detail or "延賽"
+            # 來源給的是中文（保留、取消…）就照用，英文代碼（POSTPONED、NOT_STARTED）一律顯示「延賽」
+            return self.detail if re.search(r"[\u4e00-\u9fff]", self.detail or "") else "延賽"
         if self.state == "final":
             if self.is_baseball and self.inning and self.inning != 9:
                 return f"終場 {self.inning}局"
