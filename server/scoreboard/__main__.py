@@ -93,10 +93,12 @@ async def _probe(cfg: Config, which: list[str], day: date, out: Path):
 # 診斷用：找出中職官網現在的賽程網址，以及野球革命（Rebas）有哪些賽季代碼（季後賽、總冠軍賽）
 DIAG_URLS = [
     "https://www.cpbl.com.tw/",
-    "https://www.rebas.tw/api/seasons/CPBL-2026-oB/games",
-    "https://www.rebas.tw/api/leagues/CPBL/seasons",
-    "https://www.rebas.tw/api/seasons?league=CPBL",
-    "https://www.rebas.tw/league/CPBL",
+    "https://www.cpbl.com.tw/schedule",  # 同一個 client，先逛過首頁、帶著 cookie 再進賽程頁
+    "https://www.rebas.tw/api/seasons/CPBL-2026-oB",
+    "https://www.rebas.tw/api/leagues/CPBL",
+    "https://www.rebas.tw/api/leagues",
+    "https://www.rebas.tw/api/seasons",
+    "https://www.rebas.tw/season/CPBL-2026-oB",
 ]
 
 
@@ -126,7 +128,9 @@ def _summarize(url: str, r) -> None:
             sp = [x["away"].get("scheduled_SP") for x in rows if x.get("away", {}).get("scheduled_SP")]
             print("    scheduled_SP 範例：", sp[:2])
         elif isinstance(rows, (list, dict)):
-            print("    內容開頭：", str(rows)[:600])
+            print("    內容開頭：", str(rows)[:1200])
+    if r.status_code == 200 and "json" not in r.headers.get("content-type", ""):
+        print("    內容類型：", r.headers.get("content-type"), "開頭：", r.text[:200].replace("\n", " "))
 
 
 async def _diagnose(out: Path):
@@ -135,7 +139,8 @@ async def _diagnose(out: Path):
     async with make_client() as client:
         for i, url in enumerate(DIAG_URLS, 1):
             try:
-                r = await client.get(url)
+                referer = {"Referer": "https://www.cpbl.com.tw/"} if "cpbl.com.tw/schedule" in url else {}
+                r = await client.get(url, headers=referer)
                 print(f"  {r.status_code}  {url}  ({len(r.content)} bytes)")
                 (raw_dir / f"diag{i:02d}.txt").write_text(f"GET {url}\nHTTP {r.status_code}\n\n{r.text}", encoding="utf-8")
                 _summarize(url, r)
