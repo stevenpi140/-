@@ -33,7 +33,7 @@ def demo_games(cfg: Config) -> list[Game]:
              label="", period=3, clock="05:21"),
         Game("CPBL", "d3", now + timedelta(minutes=17), "pre",
              _tw(CPBL_TEAMS, "中信兄弟", pitcher="勝騎士"), _tw(CPBL_TEAMS, "味全龍", pitcher="梅賽德"),
-             venue="大巨蛋", label="總冠軍賽G6"),
+             venue="大巨蛋", label="台灣大賽G7"),
         Game("TPBL", "d4", now + timedelta(hours=3), "pre",
              _tw(TPBL_TEAMS, "新北國王"), _tw(TPBL_TEAMS, "新竹御嵿攻城獅"), venue="新莊體育館"),
         Game("PLG", "d5", now - timedelta(hours=4), "final",

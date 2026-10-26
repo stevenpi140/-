@@ -170,7 +170,8 @@ def test_rebas_cpbl():
                      "started_at": "2026-10-26 18:35", "ended_at": "", "location_abbr": "樂天桃園", "innings": 3},
         },
         {
-            "uniqid": "A2", "group": "總冠軍賽",
+            "uniqid": "A2", "group": "季後賽", "seq": 7,
+            "season": {"title": "中職2026年-台灣大賽", "type": "POSTSEASON", "uniqid": "CPBL-2026-LU"},
             "away": {"team": "中信兄弟", "runs": 0, "scores": [], "scheduled_SP": "勝騎士"},
             "home": {"team": "味全龍", "runs": 0, "scores": [], "scheduled_SP": "梅賽德"},
             "info": {"status": "NOT_STARTED", "finished_status": "NORMAL", "scheduled_start_at": "2026-10-26 18:35",
@@ -185,7 +186,7 @@ def test_rebas_cpbl():
     assert (live.away.name, live.away.score, live.home.name, live.home.score) == ("富邦", 6, "樂天", 1)
     assert live.venue == "樂天桃園" and live.label == ""
     assert pre.state == "pre" and pre.away.score is None
-    assert pre.away.pitcher == "勝騎士" and pre.label == "總冠軍賽"
+    assert pre.away.pitcher == "勝騎士" and pre.label == "台灣大賽G7"
 
 
 def test_tpbl_completed_without_status_update():

@@ -139,6 +139,13 @@ def parse(rows: list[dict], cfg: Config, day: date) -> list[Game]:
             lines.append(TeamLine(code, short, str(side.get("team", "")), color, score, _sp(side)))
         a_innings, h_innings = len(away.get("scores") or []), len(home.get("scores") or [])
         group = str(g.get("group") or "")
+        season = g.get("season") or {}
+        if group not in ("", "例行賽") or str(season.get("type", "")).upper() in ("POSTSEASON", "CHALLENGE"):
+            # 季後賽的 group 只寫「季後賽」，用賽季標題「中職2026年-台灣大賽」＋場次 seq 組成「台灣大賽G7」
+            name = str(season.get("title") or "").split("-")[-1].strip() or group
+            label = f"{name}G{g['seq']}" if to_int(g.get("seq")) else name
+        else:
+            label = ""
         out.append(
             Game(
                 league="CPBL",
@@ -148,7 +155,7 @@ def parse(rows: list[dict], cfg: Config, day: date) -> list[Game]:
                 away=lines[0],
                 home=lines[1],
                 venue=str(info.get("location_abbr") or info.get("location") or ""),
-                label="" if group in ("", "例行賽") else group,
+                label=label,
                 # 進行中：客隊已有第 n 局成績、主隊還沒有 → n 局上；兩隊一樣多 → n 局下
                 inning=(a_innings or None) if state == "live" else (to_int(info.get("innings")) or None),
                 top=(a_innings > h_innings) if state == "live" else None,
