@@ -60,7 +60,19 @@ async def _probe(cfg: Config, which: list[str], day: date, out: Path):
     from .leagues import ALL
 
     out.mkdir(parents=True, exist_ok=True)
-    async with make_client() as client:
+    raw_dir = out / "raw"
+    raw_dir.mkdir(exist_ok=True)
+    counter = {"n": 0}
+
+    async def save_response(r):
+        # 把每一個 HTTP 回應原封不動存下來，官網改版時拿來對照欄位
+        await r.aread()
+        counter["n"] += 1
+        name = f"{counter['n']:02d}_{r.request.method}_{r.url.host}{r.url.path}".replace("/", "_")[:120]
+        body = f"{r.request.method} {r.url}\nHTTP {r.status_code}\n\n" + r.text
+        (raw_dir / f"{name}.txt").write_text(body, encoding="utf-8")
+
+    async with make_client(event_hooks={"response": [save_response]}) as client:
         for cls in ALL:
             if which and cls.key not in which:
                 continue

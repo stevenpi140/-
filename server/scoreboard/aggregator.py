@@ -106,9 +106,10 @@ class Aggregator:
         ]
 
 
-def make_client() -> httpx.AsyncClient:
+def make_client(**kwargs) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=20,
         follow_redirects=True,
         headers={"User-Agent": UA, "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8"},
+        **kwargs,
     )
