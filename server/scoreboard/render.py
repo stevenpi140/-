@@ -148,6 +148,30 @@ class Renderer:
                         d.point((x + i * 4 + rx, y + ry), fill=fill)
         return width
 
+    def _overview_layout(self, rows, drop_final: bool) -> dict | None:
+        """總覽頁的共用欄位位置；放不下就回傳 None。"""
+        f = self.small
+        show = [bool(st) and g.state != "postponed" and not (drop_final and g.state == "final")
+                for g, *_, st in rows]
+        st_w = max((self.tw(st, f) + 3 for (*_, st), on in zip(rows, show) if on), default=0)
+        away_w = max((self.tw(a, f) for _, a, *_ in rows), default=0)
+        home_w = max((self.tw(h, f) for _, _, h, *_ in rows), default=0)
+        home_right = self.w - st_w
+        lo, hi = 4 + away_w + 2, home_right - home_w - 2  # 比分可以用的範圍（左右各留 2px）
+        need_l = need_r = sep_w = 0
+        for *_, mid, _, _ in rows:
+            left, sep, right = _split_mid(mid)
+            if sep:
+                need_l, need_r = max(need_l, self.tw(left, f)), max(need_r, self.tw(right, f))
+                sep_w = max(sep_w, self.tw(sep, f))
+            else:
+                half = self.tw(mid, f) // 2 + 1
+                need_l, need_r = max(need_l, half), max(need_r, half)
+        if need_l + sep_w + need_r > hi - lo:
+            return None
+        sep_x = (lo + hi - (need_l + sep_w + need_r)) // 2 + need_l
+        return {"home_right": home_right, "sep_x": sep_x, "show": show}
+
     # ---------- 頁面 ----------
     def overview(self, games: list[Game], now: datetime, page: int = 1, pages: int = 1) -> Image.Image:
         img, d = self._canvas()
@@ -155,29 +179,39 @@ class Renderer:
         self.text(d, (1, 0), title, self.small, YELLOW)
         if pages > 1:
             self.text(d, (self.w - 1, 0), f"{page}/{pages}", self.small, DIM, anchor_right=True)
-        for i, g in enumerate(games[: self.overview_rows]):
-            y = OVERVIEW_TOP + i * OVERVIEW_ROW_H
-            d.rectangle([0, y + 2, 1, y + 11], fill=LEAGUE_COLORS.get(g.league, WHITE))
-            live = g.state == "live"
-            win_a, win_h = _winner(g)
+        rows = []
+        for g in games[: self.overview_rows]:
             if g.state == "pre":
                 mid, mid_color = g.start.strftime("%H:%M"), DIM
             elif g.state == "postponed":
                 mid, mid_color = "延賽", DIM
             else:
-                mid, mid_color = f"{g.away.score or 0}-{g.home.score or 0}", WHITE if live else DIM
-            away, home = _tiny(g.away.name), _tiny(g.home.name)
-            aw, hw, mw = self.tw(away, self.small), self.tw(home, self.small), self.tw(mid, self.small)
-            st = g.short_status()
-            sw = self.tw(st, self.small) + 3 if st else 0
-            if 4 + aw + mw + hw + sw + 4 > self.w and g.state == "final":
-                st, sw = "", 0  # 放不下時，終場的「終」可以省略（比分已變暗）
-            home_x = self.w - sw - hw
+                mid, mid_color = f"{g.away.score or 0}-{g.home.score or 0}", WHITE if g.state == "live" else DIM
+            rows.append((g, _tiny(g.away.name), _tiny(g.home.name), mid, mid_color, g.short_status()))
+        # 固定欄位：每一列共用同一個「主隊右緣」和「比分中心」，上下才會對齊。
+        # 放不下時先拿掉終場的「終」（比分已經變暗，看得出是終場）
+        layout = self._overview_layout(rows, drop_final=False) or self._overview_layout(rows, drop_final=True)
+        for i, (g, away, home, mid, mid_color, st) in enumerate(rows):
+            y = OVERVIEW_TOP + i * OVERVIEW_ROW_H
+            d.rectangle([0, y + 2, 1, y + 11], fill=LEAGUE_COLORS.get(g.league, WHITE))
+            win_a, win_h = _winner(g)
+            if layout:
+                home_right, sx, show = layout["home_right"], layout["sep_x"], layout["show"][i]
+            else:  # 真的放不下：退回每列各自置中
+                show = g.state not in ("final", "postponed") and bool(st)
+                home_right = self.w - (self.tw(st, self.small) + 3 if show else 0)
+                aw, hw = self.tw(away, self.small), self.tw(home, self.small)
+                sx = (4 + aw + home_right - hw) // 2 - self.tw(mid, self.small) // 2 + self.tw(_split_mid(mid)[0], self.small)
             self.text(d, (4, y), away, self.small, DIM if win_h else g.away.color)
-            self.text(d, (home_x, y), home, self.small, DIM if win_a else g.home.color)
-            self.text(d, ((4 + aw + home_x - mw) // 2, y), mid, self.small, mid_color)
-            if st:
-                self.text(d, (self.w, y), st, self.small, GREEN if live else DIM, anchor_right=True)
+            self.text(d, (home_right, y), home, self.small, DIM if win_a else g.home.color, anchor_right=True)
+            left, sep, right = _split_mid(mid)
+            if layout and not sep:
+                sx -= self.tw(mid, self.small) // 2  # 「延賽」這種沒有分隔符號的，以中心對齊
+            self.text(d, (sx, y), left, self.small, mid_color, anchor_right=True)
+            sw = self.text(d, (sx, y), sep, self.small, mid_color) if sep else 0
+            self.text(d, (sx + sw, y), right, self.small, mid_color)
+            if show:
+                self.text(d, (self.w, y), st, self.small, GREEN if g.state == "live" else DIM, anchor_right=True)
         return img
 
     @property
@@ -302,6 +336,14 @@ def _winner(g: Game) -> tuple[bool, bool]:
     if g.state != "final" or g.away.score is None or g.home.score is None:
         return False, False
     return g.away.score > g.home.score, g.home.score > g.away.score
+
+
+def _split_mid(mid: str) -> tuple[str, str, str]:
+    """把「88-91」「19:05」拆成左、分隔符號、右；「延賽」沒有分隔符號。"""
+    for sep in ("-", ":"):
+        if sep in mid:
+            return mid.partition(sep)
+    return "", "", mid
 
 
 def _tiny(name: str) -> str:
