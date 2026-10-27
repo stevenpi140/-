@@ -90,57 +90,94 @@ async def _probe(cfg: Config, which: list[str], day: date, out: Path):
                 print(f"{cls.name:5} 失敗：{type(e).__name__}: {e}")
 
 
-# 診斷用：找出中職官網現在的賽程網址，以及野球革命（Rebas）有哪些賽季代碼（季後賽、總冠軍賽）
+# 診斷用：找出中職官網（www.cpbl.com.tw）現在網頁背後用的資料網址
+CPBL_PAGES = ["/", "/schedule", "/schedule/index", "/box", "/box/index", "/standings/season", "/stats/toplist"]
+CPBL_PATH_RE = r"""['"](/(?:[A-Za-z]+/)*[A-Za-z]*(?:get|Get|list|List|live|Live|data|Data|score|Score)[A-Za-z]*)['"]"""
+
+
+def _show(r, label: str = "") -> None:
+    ct = r.headers.get("content-type", "")
+    head = r.text[:300].replace("\n", " ").replace("\r", " ")
+    print(f"  {r.status_code}  {r.request.method} {r.url.path}{label}  ({len(r.content)} bytes, {ct})")
+    if r.status_code != 200:
+        keep = {k: v for k, v in r.headers.items() if k.lower() in ("server", "x-powered-by", "x-azure-ref", "cf-ray", "location")}
+        print("      標頭：", keep)
+    print("      開頭：", head)
+
+
+async def _diagnose_cpbl(client, raw_dir: Path) -> None:
+    import re
+
+    from .leagues.cpbl import BASE, find_token
+
+    print("中職官網：")
+    found: set[str] = set()
+    token = None
+    for i, path in enumerate(CPBL_PAGES, 1):
+        try:
+            r = await client.get(BASE + path, headers={"Referer": BASE + "/"})
+        except Exception as e:
+            print(f"  失敗  GET {path}  {type(e).__name__}: {e}")
+            continue
+        _show(r)
+        (raw_dir / f"cpbl{i:02d}.txt").write_text(f"GET {r.url}\nHTTP {r.status_code}\n\n{r.text}", encoding="utf-8")
+        if r.status_code == 200:
+            token = token or find_token(r.text)
+            # 網頁 JavaScript 裡呼叫的資料網址，例如 /home/getdetaillist
+            found |= set(re.findall(CPBL_PATH_RE, r.text))
+            links = sorted(set(re.findall(r'href="(/[^"#?]*)"', r.text)))
+            print("      頁面連結：", links[:30])
+    print("  token：", "有" if token else "沒有")
+    print("  網頁裡找到的資料網址：", sorted(found))
+
+    from zoneinfo import ZoneInfo
+
+    today = datetime.now(ZoneInfo("Asia/Taipei")).date()
+    form = {"calendar": f"{today.year}/{today.month:02d}/01", "location": "", "kindCode": "C",
+            "year": str(today.year), "date": today.strftime("%Y/%m/%d")}
+    headers = {"X-Requested-With": "XMLHttpRequest", "Referer": BASE + "/", "Origin": BASE}
+    if token:
+        headers["RequestVerificationToken"] = token
+    for path in sorted(found | {"/schedule/getgamedatas", "/home/getdetaillist", "/home/getgamedatas"})[:25]:
+        try:
+            r = await client.post(BASE + path, data=form, headers=headers)
+            _show(r, " [POST]")
+        except Exception as e:
+            print(f"  失敗  POST {path}  {type(e).__name__}: {e}")
+
+    # 實際跑一次程式裡的官網備援流程
+    from .leagues.cpbl import CPBL
+
+    try:
+        games = await CPBL().fetch_official(client, Config.load(None), today)
+        print(f"  官網備援流程 OK，今天 {len(games)} 場：", [f"{g.away.name}-{g.home.name} {g.status_text()}" for g in games])
+    except Exception as e:
+        print(f"  官網備援流程失敗：{type(e).__name__}: {e}")
+
+
+# 診斷用：野球革命（Rebas）有哪些賽季代碼
 DIAG_URLS = [
-    "https://www.cpbl.com.tw/",
-    "https://www.cpbl.com.tw/schedule",  # 同一個 client，先逛過首頁、帶著 cookie 再進賽程頁
-    "https://www.rebas.tw/api/seasons/CPBL-2026-oB",
     "https://www.rebas.tw/api/leagues/CPBL",
-    "https://www.rebas.tw/api/leagues",
-    "https://www.rebas.tw/api/seasons",
-    "https://www.rebas.tw/season/CPBL-2026-oB",
 ]
 
 
 def _summarize(url: str, r) -> None:
     import re
-    from collections import Counter
 
-    if "cpbl.com.tw" in url and r.status_code == 200:
-        links = sorted(set(re.findall(r'href="(/[^"#?]*(?:schedule|game|box|standing)[^"]*)"', r.text, re.I)))
-        print("    官網連結：", links[:40])
     if "rebas.tw" in url and r.status_code == 200:
         seasons = sorted(set(re.findall(r"CPBL-\d{4}-[A-Za-z0-9]+", r.text)))
         print("    出現的賽季代碼：", seasons[:40])
-        try:
-            data = r.json()
-        except ValueError:
-            return
-        rows = data.get("data") if isinstance(data, dict) else data
-        if isinstance(rows, list) and rows and isinstance(rows[0], dict) and "info" in rows[0]:
-            info = [x.get("info", {}) for x in rows]
-            print("    比賽數：", len(rows))
-            print("    status：", Counter(i.get("status") for i in info))
-            print("    finished_status：", Counter(i.get("finished_status") for i in info))
-            print("    group：", Counter(x.get("group") for x in rows))
-            dates = sorted(str(i.get("scheduled_start_at")) for i in info)
-            print("    日期範圍：", dates[0], "~", dates[-1])
-            sp = [x["away"].get("scheduled_SP") for x in rows if x.get("away", {}).get("scheduled_SP")]
-            print("    scheduled_SP 範例：", sp[:2])
-        elif isinstance(rows, (list, dict)):
-            print("    內容開頭：", str(rows)[:1200])
-    if r.status_code == 200 and "json" not in r.headers.get("content-type", ""):
-        print("    內容類型：", r.headers.get("content-type"), "開頭：", r.text[:200].replace("\n", " "))
 
 
 async def _diagnose(out: Path):
     raw_dir = out / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
     async with make_client() as client:
+        await _diagnose_cpbl(client, raw_dir)
+        print("野球革命：")
         for i, url in enumerate(DIAG_URLS, 1):
             try:
-                referer = {"Referer": "https://www.cpbl.com.tw/"} if "cpbl.com.tw/schedule" in url else {}
-                r = await client.get(url, headers=referer)
+                r = await client.get(url)
                 print(f"  {r.status_code}  {url}  ({len(r.content)} bytes)")
                 (raw_dir / f"diag{i:02d}.txt").write_text(f"GET {url}\nHTTP {r.status_code}\n\n{r.text}", encoding="utf-8")
                 _summarize(url, r)
