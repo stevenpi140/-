@@ -223,3 +223,15 @@ def test_tpbl_postponed_still_not_started():
     g = tpbl.parse(rows, CFG, date(2026, 10, 24))[0]
     assert g.state == "postponed" and g.status_text() == "延賽"
     assert g.home.score is None
+
+
+def test_live_poll_interval_per_league():
+    from scoreboard.aggregator import Aggregator
+    from scoreboard.demo import demo_games
+    from scoreboard.leagues.cpbl import CPBL
+    from scoreboard.leagues.mlb import MLB
+
+    agg = Aggregator(CFG)
+    live = [g for g in demo_games(CFG) if g.state == "live"]
+    assert agg._interval(MLB(), live) == 2
+    assert agg._interval(CPBL(), live) == 10  # 野球革命整季資料太大，最快 10 秒

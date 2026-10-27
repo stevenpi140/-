@@ -16,7 +16,7 @@ DEFAULTS = {
         "fonts": {},  # small / large 可指定字型檔
     },
     "brightness": {"day": 160, "night": 30, "night_start": "23:30", "night_end": "07:00"},
-    "poll": {"live_seconds": 15, "soon_seconds": 60, "idle_seconds": 600},
+    "poll": {"live_seconds": 2, "screen_refresh_seconds": 2, "soon_seconds": 60, "idle_seconds": 600},
     "leagues": {
         "cpbl": {"enabled": True, "teams": []},
         "mlb": {"enabled": True, "teams": []},

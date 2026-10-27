@@ -20,6 +20,8 @@ static int page = 0;   // 下一次要抓的頁
 static int shown = 0;  // 目前顯示中的頁
 static int pageCount = 1;
 static uint32_t holdUntil = 0;
+static uint32_t refreshMs = 0;    // 伺服器要求的重抓間隔：這頁有進行中的比賽時，停留期間定期更新比分
+static uint32_t nextRefresh = 0;
 static bool paused = false;
 static int fails = 0;
 static uint8_t brightness = 128;
@@ -185,13 +187,13 @@ static void setupOta() {
 
 // ---------- 網路 ----------
 
-// 抓第 p 頁畫面到 frame[]，成功回傳 true，並更新總頁數 / 停留時間 / 亮度
+// 抓第 p 頁畫面到 frame[]，成功回傳 true，並更新總頁數 / 停留時間 / 重抓間隔 / 亮度
 static bool fetchFrame(int p, uint32_t &holdMs) {
   HTTPClient http;
   String url = String(serverUrl) + "/frame?page=" + p;
   if (!http.begin(url)) return false;
-  const char *keys[] = {"X-Pages", "X-Hold-Ms", "X-Brightness"};
-  http.collectHeaders(keys, 3);
+  const char *keys[] = {"X-Pages", "X-Hold-Ms", "X-Brightness", "X-Refresh-Ms"};
+  http.collectHeaders(keys, 4);
   http.setTimeout(6000);
 
   int code = http.GET();
@@ -223,6 +225,8 @@ static bool fetchFrame(int p, uint32_t &holdMs) {
 
   pageCount = max(1L, http.header("X-Pages").toInt());
   holdMs = max(1000L, http.header("X-Hold-Ms").toInt());
+  long r = http.header("X-Refresh-Ms").toInt();
+  refreshMs = r > 0 ? max(1000L, r) : 0;
   int b = http.header("X-Brightness").toInt();
   if (b > 0 && b != brightness) {
     brightness = b;
@@ -272,6 +276,12 @@ void loop() {
   }
 
   if (millis() < holdUntil) {
+    if (refreshMs && millis() >= nextRefresh) {
+      // 停留期間重抓同一頁：只更新比分，不換頁、也不延長停留時間
+      uint32_t ignored;
+      if (fetchFrame(shown, ignored)) drawFrame();
+      nextRefresh = millis() + refreshMs;
+    }
     delay(20);
     return;
   }
@@ -294,6 +304,7 @@ void loop() {
       page = (page + 1) % pageCount;
     }
     holdUntil = millis() + holdMs;
+    nextRefresh = millis() + refreshMs;
   } else {
     if (++fails >= FAILS_BEFORE_ERROR) showText("NO SERVER", serverUrl, 0xF800);
     holdUntil = millis() + 3000;

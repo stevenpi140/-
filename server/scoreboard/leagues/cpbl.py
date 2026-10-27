@@ -23,7 +23,7 @@ from ..config import Config
 from ..models import Game, TeamLine
 from ..teams import CPBL_TEAMS, match_tw_team
 from .base import parse_iso, to_int
-from .rebas import Rebas
+from .rebas import LIVE_TTL, Rebas
 
 BASE = "https://www.cpbl.com.tw"
 # A 例行賽、E 季後挑戰賽、C 總冠軍賽、G 熱身賽
@@ -64,6 +64,7 @@ def decode_list(payload) -> list[dict]:
 class CPBL:
     key = "cpbl"
     name = "CPBL"
+    min_live_seconds = LIVE_TTL  # 野球革命每次都要下載整季資料，比賽中最快 10 秒更新一次
 
     def __init__(self):
         self._token: str | None = None

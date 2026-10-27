@@ -8,7 +8,7 @@ GET https://www.rebas.tw/api/seasons/{賽季代碼}/games 會回傳整季的比�
   away / home：team（隊名）、runs（得分）、scores（每局得分）、hits、errors、scheduled_SP（預告先發）
   info：status（FINISHED…）、scheduled_start_at（"2026-10-06 18:35"）、location_abbr、innings
   group：例行賽 / 季後賽…
-整季資料約 500KB，所以快取起來，比賽中也最多每分鐘重抓一次。
+整季資料約 500KB，所以快取起來，比賽中也最多每 10 秒重抓一次。
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from .base import to_int
 API = "https://www.rebas.tw/api/seasons/{season}/games"
 LEAGUE_API = "https://www.rebas.tw/api/leagues/CPBL"
 HEADERS = {"Accept": "application/json", "Origin": "https://www.rebas.tw", "Referer": "https://www.rebas.tw/"}
-LIVE_TTL = 60  # 有比賽進行中：最多每 60 秒重抓整季資料
+LIVE_TTL = 10  # 有比賽進行中：最多每 10 秒重抓整季資料（約 500KB，不能太頻繁）
 IDLE_TTL = 600
 SEASONS_TTL = 6 * 3600  # 賽季清單很少變動
 

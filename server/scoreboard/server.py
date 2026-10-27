@@ -4,6 +4,7 @@
   X-Page / X-Pages  這是第幾頁 / 總共幾頁
   X-Hold-Ms         這頁要停留多久（毫秒）
   X-Brightness      建議亮度 0-255
+  X-Refresh-Ms      這頁有進行中的比賽時，停留期間每隔多久重抓一次（0 = 不用重抓）
 """
 
 from __future__ import annotations
@@ -38,13 +39,20 @@ async def lifespan(_app):
 app = FastAPI(title="Scoreboard", lifespan=lifespan)
 
 
+_cache: dict = {"key": None, "pages": None}
+
+
 def _pages():
     now = datetime.now(cfg.tz)
     games = agg.games()
-    note = ""
-    if not games and agg.states and all(s.error and not s.last_ok for s in agg.states):
-        note = "資料來源連線失敗"
-    return now, games, playlist.build(renderer, cfg, games, now, note)
+    # 看板每 2 秒就會來抓一次：比賽資料沒變、又在同一分鐘內（開打倒數以分鐘為單位），就沿用上次畫好的頁面
+    key = (now.strftime("%Y-%m-%d %H:%M"), repr(games))
+    if _cache["key"] != key:
+        note = ""
+        if not games and agg.states and all(s.error and not s.last_ok for s in agg.states):
+            note = "資料來源連線失敗"
+        _cache["key"], _cache["pages"] = key, playlist.build(renderer, cfg, games, now, note)
+    return now, games, _cache["pages"]
 
 
 @app.get("/frame")
@@ -60,6 +68,7 @@ def frame(page: int = Query(0, ge=0)):
             "X-Pages": str(len(pages)),
             "X-Hold-Ms": str(p.hold_ms),
             "X-Brightness": str(playlist.brightness(cfg, now, any(g.state == "live" for g in games))),
+            "X-Refresh-Ms": str(int(cfg.raw["poll"]["screen_refresh_seconds"] * 1000) if p.live else 0),
             "Cache-Control": "no-store",
         },
     )

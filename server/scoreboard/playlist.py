@@ -17,17 +17,23 @@ def build(r: Renderer, cfg: Config, games: list[Game], now: datetime, note: str 
         return [Page("idle", 15000, r.idle(now, note))]
     if len(games) == 1:
         g = games[0]
-        return [Page("game", live_hold if g.state == "live" else hold, r.game(g, now))]
+        return [_game_page(r, g, now, hold, live_hold)]
     # 總覽頁和單場頁穿插：總覽(1-4) → 第1-4場 → 總覽(5-8) → 第5-8場 ...
     # 每一圈每一場都會輪到一次，比賽再多也不會漏掉
     pages: list[Page] = []
     n = r.overview_rows
     chunks = [games[i : i + n] for i in range(0, len(games), n)]
     for i, chunk in enumerate(chunks):
-        pages.append(Page("overview", hold, r.overview(chunk, now, i + 1, len(chunks))))
+        live = any(g.state == "live" for g in chunk)
+        pages.append(Page("overview", hold, r.overview(chunk, now, i + 1, len(chunks)), live))
         for g in chunk:
-            pages.append(Page("game", live_hold if g.state == "live" else hold, r.game(g, now)))
+            pages.append(_game_page(r, g, now, hold, live_hold))
     return pages
+
+
+def _game_page(r: Renderer, g: Game, now: datetime, hold: int, live_hold: int) -> Page:
+    live = g.state == "live"
+    return Page("game", live_hold if live else hold, r.game(g, now), live)
 
 
 def _parse_hm(s: str) -> dtime:

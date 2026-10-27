@@ -17,7 +17,8 @@ brightness:
   night_end: "07:00"
 
 poll:
-  live_seconds: 15    # 有比賽進行中：每 15 秒更新一次比分
+  live_seconds: 2     # 有比賽進行中：每 2 秒向資料來源更新一次比分
+  screen_refresh_seconds: 2   # 畫面停在進行中的比賽時，看板每 2 秒重抓一次畫面（0 = 不重抓）
   soon_seconds: 60    # 30 分鐘內有比賽要開打
   idle_seconds: 600   # 其他時間
 

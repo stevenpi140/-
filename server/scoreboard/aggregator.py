@@ -1,4 +1,8 @@
-"""定時向各聯盟抓資料。比賽進行中縮短間隔（預設 15 秒），沒比賽時拉長（預設 10 分鐘）。"""
+"""定時向各聯盟抓資料。比賽進行中縮短間隔（預設 2 秒），沒比賽時拉長（預設 10 分鐘）。
+
+聯盟可以用 min_live_seconds 設定自己的最短間隔（例如資料量很大的來源），
+config.yaml 的 leagues.<聯盟>.live_seconds 也可以個別覆蓋。
+"""
 
 from __future__ import annotations
 
@@ -44,11 +48,12 @@ class Aggregator:
         out.sort(key=lambda g: (g.start, g.league, g.id))
         return out
 
-    def _interval(self, games: list[Game]) -> float:
+    def _interval(self, lg, games: list[Game]) -> float:
         p = self.cfg.raw["poll"]
         now = datetime.now(self.cfg.tz)
         if any(g.state == "live" for g in games):
-            return p["live_seconds"]
+            live = self.cfg.league(lg.key).get("live_seconds", p["live_seconds"])
+            return max(live, getattr(lg, "min_live_seconds", 0))
         if any(g.state == "pre" and g.start - now < timedelta(minutes=30) for g in games):
             return p["soon_seconds"]
         return p["idle_seconds"]
@@ -66,7 +71,7 @@ class Aggregator:
             games = await lg.fetch(client, self.cfg, day or self.today())
             st.games = self._filter(lg.key, games)
             st.last_ok, st.error = time.time(), ""
-            st.next_due = time.time() + self._interval(st.games)
+            st.next_due = time.time() + self._interval(lg, st.games)
             log.info("%s：%d 場（下次 %ds 後更新）", lg.name, len(st.games), st.next_due - time.time())
         except Exception as e:  # 單一聯盟失敗不影響其他聯盟，保留上次成功的資料
             st.error = f"{type(e).__name__}: {e}"
@@ -88,7 +93,7 @@ class Aggregator:
                 due = [s for s in self.states if time.time() >= s.next_due]
                 if due:
                     await asyncio.gather(*(self.refresh(client, s) for s in due))
-                await asyncio.sleep(2)
+                await asyncio.sleep(0.5)
 
     def start(self):
         self._task = asyncio.create_task(self.run())

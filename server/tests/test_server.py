@@ -46,3 +46,11 @@ def test_idle_when_no_games(monkeypatch):
         r = c.get("/frame")
         assert r.headers["X-Pages"] == "1"
         assert len(r.content) == 128 * 64 * 2
+
+
+def test_live_pages_ask_for_refresh(monkeypatch):
+    games = demo_games(server.cfg)
+    with _client(monkeypatch, games) as c:
+        heads = [c.get(f"/frame?page={i}").headers for i in range(7)]
+    live = [h["X-Refresh-Ms"] for h in heads]
+    assert "2000" in live and "0" in live  # 進行中的比賽要求每 2 秒重抓，其他頁不用

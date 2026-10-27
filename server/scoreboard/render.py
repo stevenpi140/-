@@ -74,6 +74,7 @@ class Page:
     kind: str  # overview / game / idle
     hold_ms: int
     image: Image.Image
+    live: bool = False  # 這頁有進行中的比賽：看板停留期間會定期重抓，比分才會即時更新
 
 
 class Renderer:
