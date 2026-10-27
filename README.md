@@ -1,6 +1,6 @@
 # 點陣比分看板（中職／MLB／NBA／TPBL／PLG）
 
-用 ESP32 + HUB75 全彩 LED 點陣面板做的桌上比分看板。它會顯示今天你追蹤的球隊有哪些比賽，比賽進行中每 2 秒更新一次比分（中職因為資料來源的關係是 10 秒）。
+用 ESP32 + HUB75 全彩 LED 點陣面板做的桌上比分看板。它會顯示今天你追蹤的球隊有哪些比賽，比賽進行中每 2 秒更新一次比分（中職官網是 5 秒，改用野球革命時是 10 秒）。棒球還會顯示安打數和失誤數（RHE）。
 
 ![預覽](docs/preview.png)
 
@@ -10,7 +10,7 @@
 
 ```
  ┌──────────── 伺服器（樹莓派／家裡電腦／NAS，常開） ────────────┐
- │  抓資料：野球革命(中職)、MLB Stats API、ESPN(NBA)、TPBL API、PLG 官網  │
+ │  抓資料：中職官網、MLB Stats API、ESPN(NBA)、TPBL API、PLG 官網  │
  │  整理成統一格式 → 依追蹤清單篩選 → 用點陣中文字型畫成 128×64 圖 │
  │  GET /frame?page=N  → 16KB RGB565 原始畫面                       │
  └───────────────────────────────┬──────────────────────────────────┘
@@ -218,19 +218,19 @@ pio run -e waveshare_s3_ota -t upload    # 其他板子：trinity_ota / esp32dev
 |---|---|---|
 | MLB | `statsapi.mlb.com`（MLB 官方 Stats API） | 高，免金鑰 |
 | NBA | ESPN `site.api.espn.com` scoreboard | 高，非官方但已經用了很多年 |
-| 中職 | 主要：野球革命 Rebas `rebas.tw/api`（自動找出當天的例行賽／季後挑戰賽／台灣大賽賽季）；備援：中職官網 `cpbl.com.tw` | 中，網站前端使用的 JSON，未公開文件化 |
+| 中職 | 主要：中職官網 `cpbl.com.tw` 的 `/schedule/getgamedatas`（賽程）與 `/box/getlive`（比分、RHE、局數、出局、壘包）；備援：野球革命 Rebas `rebas.tw/api` | 中，官網前端使用的 JSON，未公開文件化。**官網只有台灣的網路連得上**，從國外機房會被 HiNet CDN 回 404，這時會自動改用野球革命 |
 | TPBL | `api.tpbl.basketball`（官網前端使用的 API） | 中，未公開文件化 |
 | PLG | `pleagueofficial.com` 賽程頁 HTML ＋ `/api/boxscore.preciser.php` | 中低，解析 HTML，官網改版就要調整 |
 
 所有來源都是公開網頁背後的資料，請保持合理的更新頻率。預設比賽中 2 秒、30 分鐘內要開打 1 分鐘、平時 10 分鐘：
 
 - 只有「有比賽進行中」的聯盟會用 2 秒，其他聯盟照樣 10 分鐘才抓一次。
-- 中職（野球革命）每次都要下載整季資料（約 500KB），所以程式固定最快 10 秒一次，設定再小也不會更快。
+- 中職官網的單場資料每次都包含整場的逐球紀錄，所以最快 5 秒一次；改用野球革命時，每次都要下載整季資料（約 500KB），最快 10 秒一次。設定再小也不會更快。
 - 想個別調整可以在 `config.yaml` 寫 `leagues.nba.live_seconds: 5` 這樣。
 - 2 秒只是我們去問的頻率，比分多快出現還是要看資料來源自己多久更新一次。
 - 看板停在進行中比賽的頁面時，也會每 2 秒重抓一次畫面（`poll.screen_refresh_seconds`），不用等輪播一圈回來才看到新比分。
 
-> ✅ MLB、NBA、TPBL、中職（野球革命）都已經在 GitHub Actions 上用真實資料驗證過。
+> ✅ MLB、NBA、TPBL、中職（野球革命）都已經在 GitHub Actions 上用真實資料驗證過。中職官網只能從台灣連線，已確認在家裡的網路可以取得 `/schedule/getgamedatas` 與 `/box/getlive`；解析程式是依照欄位清單寫的，第一次在家跑 `python -m scoreboard probe cpbl` 時請確認狀態和 RHE 是否正確。
 >
 > ⚠️ **PLG 官網有 Cloudflare 驗證**，從雲端主機連會被擋（HTTP 403）。請在家裡的網路跑 `python -m scoreboard probe plg` 確認；如果家裡也被擋，PLG 只能先關閉（`leagues.plg.enabled: false`）。本專案不會去繞過網站的機器人驗證。
 >

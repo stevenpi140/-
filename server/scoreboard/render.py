@@ -19,12 +19,14 @@ from .models import LEAGUE_COLORS, Game
 WHITE = (255, 255, 255)
 DIM = (110, 110, 110)
 DARK = (50, 50, 50)
+LIGHT = (190, 190, 190)
 YELLOW = (255, 210, 60)
 RED = (255, 50, 50)
 GREEN = (60, 230, 90)
 WEEKDAYS = "一二三四五六日"
 OVERVIEW_TOP = 12  # 總覽頁標題列高度
 OVERVIEW_ROW_H = 12  # 12px 字型剛好一列
+RHE_X = 83  # 單場頁 H / E 小字的位置：右邊留給兩位數比分（x 104 起）和進攻三角形（x 98 起）
 
 HERE = Path(__file__).resolve().parent.parent / "fonts"
 
@@ -56,6 +58,22 @@ DIGITS = {
     ":": ["00000", "01100", "01100", "00000", "01100", "01100", "00000"],
     "-": ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
     " ": ["00000"] * 7,
+}
+
+# 3x5 迷你點陣字（安打 H、失誤 E 的小字用）
+MINI = {
+    "0": ["111", "101", "101", "101", "111"],
+    "1": ["010", "110", "010", "010", "111"],
+    "2": ["111", "001", "111", "100", "111"],
+    "3": ["111", "001", "111", "001", "111"],
+    "4": ["101", "101", "111", "001", "001"],
+    "5": ["111", "100", "111", "001", "111"],
+    "6": ["111", "100", "111", "101", "111"],
+    "7": ["111", "001", "010", "010", "010"],
+    "8": ["111", "101", "111", "101", "111"],
+    "9": ["111", "101", "111", "001", "111"],
+    "H": ["101", "101", "111", "101", "101"],
+    "E": ["111", "100", "111", "100", "111"],
 }
 
 
@@ -116,6 +134,18 @@ class Renderer:
                     if bit == "1":
                         px, py = x + i * cw + rx * scale, y + ry * scale
                         d.rectangle([px, py, px + scale - 1, py + scale - 1], fill=fill)
+        return width
+
+    def mini(self, d, x, y, s: str, fill, right=False) -> int:
+        """3x5 迷你字，每字寬 3、間距 1。"""
+        width = len(s) * 4 - 1
+        if right:
+            x -= width
+        for i, ch in enumerate(s):
+            for ry, row in enumerate(MINI.get(ch, ["000"] * 5)):
+                for rx, bit in enumerate(row):
+                    if bit == "1":
+                        d.point((x + i * 4 + rx, y + ry), fill=fill)
         return width
 
     # ---------- 頁面 ----------
@@ -184,6 +214,12 @@ class Renderer:
                 if batting:  # 進攻方：比分左邊一個小三角形
                     bx = self.w - 2 - w - 6
                     d.polygon([(bx, y + 4), (bx, y + 10), (bx + 3, y + 7)], fill=YELLOW)
+                if g.is_baseball and t.hits is not None:
+                    # 安打 H、失誤 E：疊成兩行小字，固定放在兩位數比分和三角形的左邊，上下兩隊才會對齊
+                    num_color = DIM if lose else LIGHT
+                    for dy, letter, n in ((2, "H", t.hits), (9, "E", t.errors or 0)):
+                        self.mini(d, RHE_X, y + dy, letter, DIM)
+                        self.mini(d, RHE_X + 12, y + dy, str(n), num_color, right=True)
 
         # 底列：狀態
         y = 51

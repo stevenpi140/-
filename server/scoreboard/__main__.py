@@ -84,8 +84,11 @@ async def _probe(cfg: Config, which: list[str], day: date, out: Path):
                 )
                 print(f"{cls.name:5} OK，{len(games)} 場")
                 for g in games:
+                    rhe = ""
+                    if g.away.hits is not None:
+                        rhe = f"  H {g.away.hits}-{g.home.hits} E {g.away.errors}-{g.home.errors}"
                     print(f"      {g.start:%H:%M} {g.away.name} {g.away.score} - {g.home.score} {g.home.name}"
-                          f"  [{g.status_text()}] 原始狀態={g.detail} {g.label}")
+                          f"  [{g.status_text()}]{rhe} 原始狀態={g.detail} {g.label} 來源={g.extra.get('source', '')}")
             except Exception as e:
                 print(f"{cls.name:5} 失敗：{type(e).__name__}: {e}")
 

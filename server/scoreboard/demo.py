@@ -14,9 +14,9 @@ def _tw(table, full, score=None, pitcher=None):
     return TeamLine(code, short, full, color, score, pitcher)
 
 
-def _mlb(tid, score):
+def _mlb(tid, score, hits=None, errors=None):
     code, zh, color = mlb_team(tid)
-    return TeamLine(code, zh, code, color, score)
+    return TeamLine(code, zh, code, color, score, hits=hits, errors=errors)
 
 
 def _nba(abbr, score):
@@ -27,7 +27,7 @@ def _nba(abbr, score):
 def demo_games(cfg: Config) -> list[Game]:
     now = datetime.now(cfg.tz).replace(second=0, microsecond=0)
     return [
-        Game("MLB", "d1", now - timedelta(hours=2), "live", _mlb(119, 3), _mlb(141, 2),
+        Game("MLB", "d1", now - timedelta(hours=2), "live", _mlb(119, 3, 7, 0), _mlb(141, 2, 11, 1),
              venue="Rogers Centre", label="世界大賽G3", inning=7, top=False, outs=1, bases=(True, False, True)),
         Game("NBA", "d2", now - timedelta(hours=1), "live", _nba("GS", 88), _nba("LAL", 91),
              label="", period=3, clock="05:21"),

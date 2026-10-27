@@ -1,5 +1,6 @@
 """解析器測試。樣本是依各來源已知欄位手寫的最小 JSON / HTML，不是真實比賽資料。"""
 
+import json
 from datetime import date, datetime, timedelta
 
 from scoreboard.config import Config
@@ -26,6 +27,7 @@ def test_mlb_live_and_filters_by_taipei_date():
                         },
                         "linescore": {
                             "currentInning": 7, "isTopInning": False, "inningState": "Bottom", "outs": 1,
+                            "teams": {"away": {"runs": 3, "hits": 7, "errors": 0}, "home": {"runs": 2, "hits": 5, "errors": 1}},
                             "offense": {"first": {"id": 1}, "third": {"id": 2}},
                         },
                         "venue": {"name": "Rogers Centre"},
@@ -48,6 +50,7 @@ def test_mlb_live_and_filters_by_taipei_date():
     assert g.state == "live" and g.status_text() == "7局下"
     assert g.bases == (True, False, True) and g.outs == 1
     assert g.label == "世界大賽G3"
+    assert (g.away.hits, g.away.errors, g.home.hits, g.home.errors) == (7, 0, 5, 1)
 
 
 def test_mlb_end_of_inning_shows_next_half():
@@ -95,10 +98,10 @@ def test_cpbl_rows():
         {"GameSno": 5, "GameDate": "2026-10-25T00:00:00", "PreExeDate": "2026-10-25T18:35:00",
          "VisitingTeamName": "味全龍", "HomeTeamName": "中信兄弟", "GameStatus": 3},
     ]
-    games = cpbl.parse_rows(rows, "C", CFG, DAY)
+    games = cpbl.parse_rows(rows, "C", CFG, DAY, now=datetime(2026, 10, 26, 12, tzinfo=CFG.tz))
     assert len(games) == 1
     g = games[0]
-    assert g.state == "pre" and g.label == "總冠軍賽G6"
+    assert g.state == "pre" and g.label == "台灣大賽G6"
     assert (g.away.name, g.home.name) == ("中信", "味全")
     assert g.away.pitcher == "勝騎士"
     assert g.start.hour == 18 and g.start.minute == 35
@@ -119,6 +122,82 @@ def test_cpbl_live_scoreboard():
                                           '{"InningSeq":2,"VisitingHomeType":1,"ScoreCnt":2}]'})
     assert g.status_text() == "2局上"
     assert (g.away.score, g.home.score) == (3, 0)
+
+
+def test_cpbl_schedule_finished_game_not_pre():
+    # 10/17 台灣大賽 G1：賽程介面的 PresentStatus=1，但其實已經比完 0:3（之前被誤判成未開打）
+    row = {"GameSno": 1, "KindCode": "C", "PresentStatus": 1, "GameDate": "2026-10-17T00:00:00",
+           "PreExeDate": "2026-10-17T18:35:00", "GameDateTimeS": "2026-10-17T18:35:00",
+           "GameDateTimeE": "2026-10-17T21:41:00", "GameResult": "2", "IsGameStop": "N",
+           "VisitingTeamName": "中信兄弟", "HomeTeamName": "味全龍", "VisitingScore": 0, "HomeScore": 3,
+           "VisitingPitcherName": "勝騎士", "HomePitcherName": "梅賽德"}
+    later = datetime(2026, 10, 27, 12, tzinfo=CFG.tz)
+    g = cpbl.parse_rows([row], "C", CFG, date(2026, 10, 17), now=later)[0]
+    assert g.state == "final" and (g.away.score, g.home.score) == (0, 3)
+    # 就算只有比分、其他欄位都空的，過了那一天也一定是終場
+    bare = {k: row[k] for k in ("GameSno", "GameDate", "PreExeDate", "VisitingTeamName", "HomeTeamName",
+                                "VisitingScore", "HomeScore", "PresentStatus")}
+    assert cpbl.parse_rows([bare], "C", CFG, date(2026, 10, 17), now=later)[0].state == "final"
+    # 還沒開打的比賽（比分 0:0、沒有開打／結束時間）
+    future = {**bare, "VisitingScore": 0, "HomeScore": 0}
+    before = datetime(2026, 10, 17, 12, tzinfo=CFG.tz)
+    assert cpbl.parse_rows([future], "C", CFG, date(2026, 10, 17), now=before)[0].state == "pre"
+
+
+def _box(status, chi, board, logs=None):
+    return {"Success": True,
+            "GameDetailJson": json.dumps([{"GameStatus": status, "GameStatusChi": chi}]),
+            "ScoreboardJson": json.dumps(board), "LiveLogJson": json.dumps(logs or [])}
+
+
+def test_cpbl_getlive_final_with_rhe():
+    g = cpbl.parse_rows([{"GameSno": 7, "PreExeDate": "2026-10-26T18:35:00", "VisitingTeamName": "中信兄弟",
+                          "HomeTeamName": "味全龍"}], "C", CFG, DAY, now=datetime(2026, 10, 26, 18, tzinfo=CFG.tz))[0]
+    board = [{"InningSeq": i, "VisitingHomeType": vh, "ScoreCnt": r, "HittingCnt": h, "ErrorCnt": e}
+             for i in range(1, 11) for vh, r, h, e in ((1, 0, 1, 0), (2, 1 if i == 10 else 0, 1, 1 if i == 3 else 0))]
+    cpbl.apply_live(g, _box(3, "比賽結束", board))
+    assert g.state == "final" and g.status_text() == "終場 10局"
+    assert (g.away.score, g.away.hits, g.away.errors) == (0, 10, 0)
+    assert (g.home.score, g.home.hits, g.home.errors) == (1, 10, 1)
+
+
+def test_cpbl_getlive_live_count_from_livelog():
+    g = cpbl.parse_rows([{"GameSno": 7, "PreExeDate": "2026-10-26T18:35:00", "VisitingTeamName": "中信兄弟",
+                          "HomeTeamName": "味全龍"}], "C", CFG, DAY, now=datetime(2026, 10, 26, 18, tzinfo=CFG.tz))[0]
+    board = [{"InningSeq": 1, "VisitingHomeType": 1, "ScoreCnt": 2, "HittingCnt": 3, "ErrorCnt": 0},
+             {"InningSeq": 1, "VisitingHomeType": 2, "ScoreCnt": 0, "HittingCnt": 0, "ErrorCnt": 1},
+             {"InningSeq": 2, "VisitingHomeType": 1, "ScoreCnt": 0, "HittingCnt": 1, "ErrorCnt": 0}]
+    logs = [  # 故意打亂順序：要照局數與事件編號排序，不能直接取最後一筆
+        {"InningSeq": 2, "VisitingHomeType": "1", "MainEventNo": "0031", "OutCnt": 1, "BallCnt": 2, "StrikeCnt": 1,
+         "FirstBase": "0000001234", "SecondBase": "", "ThirdBase": "0000005678", "PitcherName": "梅賽德",
+         "HitterName": "許基宏"},
+        {"InningSeq": 1, "VisitingHomeType": "2", "MainEventNo": "0020", "OutCnt": 3},
+    ]
+    cpbl.apply_live(g, _box(2, "比賽中", board, logs))
+    assert g.state == "live" and g.status_text() == "2局上"
+    assert (g.away.score, g.away.hits, g.home.errors) == (2, 4, 1)
+    assert g.outs == 1 and g.bases == (True, False, True)
+    assert g.extra["balls"] == 2 and g.extra["batter"] == "許基宏"
+    # 最後一筆是三出局：直接顯示下一個半局
+    cpbl.apply_live(g, _box(2, "比賽中", board, [{"InningSeq": 2, "VisitingHomeType": "1", "MainEventNo": "40",
+                                                 "OutCnt": 3, "FirstBase": "x"}]))
+    assert g.status_text() == "2局下" and g.outs == 0 and g.bases == (False, False, False)
+
+
+def test_cpbl_falls_back_to_rebas(monkeypatch):
+    import asyncio
+
+    c = cpbl.CPBL()
+
+    async def official(*a):
+        raise RuntimeError("HTTP 404")
+
+    async def rebas(*a):
+        return ["rebas-game"]
+
+    monkeypatch.setattr(c, "fetch_official", official)
+    monkeypatch.setattr(c.rebas, "fetch", rebas)
+    assert asyncio.run(c.fetch(None, CFG, DAY)) == ["rebas-game"]
 
 
 def test_tpbl():
@@ -164,8 +243,8 @@ def test_rebas_cpbl():
     rows = [
         {
             "uniqid": "A1", "group": "例行賽",
-            "away": {"team": "富邦悍將", "runs": 6, "scores": ["5", "0", "1"], "scheduled_SP": None},
-            "home": {"team": "樂天桃猿", "runs": 1, "scores": ["0", "0"], "scheduled_SP": None},
+            "away": {"team": "富邦悍將", "runs": 6, "hits": 9, "errors": 0, "scores": ["5", "0", "1"], "scheduled_SP": None},
+            "home": {"team": "樂天桃猿", "runs": 1, "hits": 3, "errors": 2, "scores": ["0", "0"], "scheduled_SP": None},
             "info": {"status": "PLAYING", "finished_status": "NORMAL", "scheduled_start_at": "2026-10-26 18:35",
                      "started_at": "2026-10-26 18:35", "ended_at": "", "location_abbr": "樂天桃園", "innings": 3},
         },
@@ -185,6 +264,8 @@ def test_rebas_cpbl():
     assert live.state == "live" and live.status_text() == "3局上"
     assert (live.away.name, live.away.score, live.home.name, live.home.score) == ("富邦", 6, "樂天", 1)
     assert live.venue == "樂天桃園" and live.label == ""
+    assert (live.away.hits, live.home.errors) == (9, 2)
+    assert pre.away.hits is None
     assert pre.state == "pre" and pre.away.score is None
     assert pre.away.pitcher == "勝騎士" and pre.label == "台灣大賽G7"
 
@@ -234,4 +315,4 @@ def test_live_poll_interval_per_league():
     agg = Aggregator(CFG)
     live = [g for g in demo_games(CFG) if g.state == "live"]
     assert agg._interval(MLB(), live) == 2
-    assert agg._interval(CPBL(), live) == 10  # 野球革命整季資料太大，最快 10 秒
+    assert agg._interval(CPBL(), live) == 5  # 官網單場資料含整場逐球紀錄，最快 5 秒

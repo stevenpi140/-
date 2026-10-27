@@ -85,14 +85,19 @@ def parse(data: dict, cfg: Config, day: date) -> list[Game]:
                 top = False
             elif state == "live" and inning_state == "End" and inning:
                 inning, top = inning + 1, True
+            away, home = _side(g["teams"]["away"]), _side(g["teams"]["home"])
+            if state in ("live", "final"):
+                for line, key in ((away, "away"), (home, "home")):
+                    t = (ls.get("teams") or {}).get(key) or {}
+                    line.hits, line.errors = to_int(t.get("hits")), to_int(t.get("errors"))
             games.append(
                 Game(
                     league="MLB",
                     id=str(g.get("gamePk")),
                     start=start,
                     state=state,  # type: ignore[arg-type]
-                    away=_side(g["teams"]["away"]),
-                    home=_side(g["teams"]["home"]),
+                    away=away,
+                    home=home,
                     venue=(g.get("venue") or {}).get("name", ""),
                     label=label,
                     inning=inning,

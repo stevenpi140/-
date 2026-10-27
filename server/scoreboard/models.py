@@ -28,6 +28,8 @@ class TeamLine:
     color: tuple[int, int, int] = (255, 255, 255)
     score: Optional[int] = None
     pitcher: Optional[str] = None  # 棒球：先發投手
+    hits: Optional[int] = None  # 棒球：安打（RHE 的 H）
+    errors: Optional[int] = None  # 棒球：失誤（RHE 的 E）
 
 
 @dataclass
