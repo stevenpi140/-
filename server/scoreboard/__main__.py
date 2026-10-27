@@ -128,6 +128,11 @@ async def _diagnose_cpbl(client, raw_dir: Path) -> None:
             links = sorted(set(re.findall(r'href="(/[^"#?]*)"', r.text)))
             print("      頁面連結：", links[:30])
     print("  token：", "有" if token else "沒有")
+    home = (raw_dir / "cpbl01.txt").read_text(encoding="utf-8") if (raw_dir / "cpbl01.txt").exists() else ""
+    # 首頁的比分區塊是直接寫在 HTML 裡，還是靠 JavaScript 另外抓
+    for kw in ("getdetaillist", "GameSno", "中信兄弟", "味全龍", "台灣大賽"):
+        for m in list(re.finditer(kw, home))[:2]:
+            print(f"      首頁「{kw}」附近：", home[max(0, m.start() - 300): m.end() + 300].replace("\n", " ")[:700])
     print("  網頁裡找到的資料網址：", sorted(found))
 
     from zoneinfo import ZoneInfo
