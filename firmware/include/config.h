@@ -11,6 +11,10 @@
 
 // 某些面板（FM6126A 驅動晶片）開機全黑或亂碼時，把這行打開
 // #define PANEL_DRIVER_FM6126A
+#if defined(BOARD_WAVESHARE_S3)
+// 微雪官方範例搭配自家面板都設定 FM6126A；畫面異常時可以註解掉這行試試
+#define PANEL_DRIVER_FM6126A
+#endif
 
 // 畫面左右顛倒或錯位時可試著切換
 #define PANEL_CLKPHASE false
@@ -42,3 +46,21 @@
 #endif
 // 區網名稱：scoreboard.local
 #define OTA_HOSTNAME "scoreboard"
+
+// ===== 整點報時（喇叭）=====
+// 時間表和音檔都在伺服器的 config.yaml（chime 區段）設定；只有板子上有喇叭的才會發聲
+#if defined(BOARD_WAVESHARE_S3)
+// 微雪 ESP32-S3-RGB-Matrix：ES8311 音訊晶片 + 功放，腳位取自微雪官方範例 09_Music_Player
+#define HAS_SPEAKER 1
+#define PIN_CODEC_SDA 47
+#define PIN_CODEC_SCL 48
+#define PIN_I2S_MCLK 12
+#define PIN_I2S_BCLK 43
+#define PIN_I2S_LRC 38
+#define PIN_I2S_DOUT 21
+#define PIN_AUDIO_PA 11  // 功放開關，HIGH = 開
+#else
+#define HAS_SPEAKER 0
+#endif
+#define CHIME_SAMPLE_RATE 48000               // 伺服器轉好的格式：48kHz、16-bit、單聲道
+#define CHIME_MAX_BYTES (4 * 1024 * 1024)     // 最長約 40 秒，放在 PSRAM

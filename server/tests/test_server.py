@@ -54,3 +54,26 @@ def test_live_pages_ask_for_refresh(monkeypatch):
         heads = [c.get(f"/frame?page={i}").headers for i in range(7)]
     live = [h["X-Refresh-Ms"] for h in heads]
     assert "2000" in live and "0" in live  # 進行中的比賽要求每 2 秒重抓，其他頁不用
+
+
+def test_chime_endpoints(monkeypatch, tmp_path):
+    import wave
+
+    from scoreboard.chime import Chime
+    from scoreboard.config import Config
+
+    wav = tmp_path / "c.wav"
+    with wave.open(str(wav), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(48000)
+        w.writeframes(b"\x10\x00" * 4800)  # 0.1 秒
+    cfg = Config({**server.cfg.raw, "chime": {**server.cfg.raw["chime"], "enabled": True, "file": str(wav)}})
+    monkeypatch.setattr(server, "chime", Chime(cfg))
+    with _client(monkeypatch, demo_games(server.cfg)) as c:
+        assert c.post("/api/chime/test").json()["ok"]
+        h = c.get("/frame").headers
+        assert h["X-Chime-In"] == "0" and h["X-Chime-Ver"]
+        r = c.get("/chime.pcm")
+        assert r.status_code == 200 and len(r.content) == 9600
+        assert c.get("/api/status").json()["chime"]["enabled"]

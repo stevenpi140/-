@@ -5,6 +5,7 @@
   X-Hold-Ms         這頁要停留多久（毫秒）
   X-Brightness      建議亮度 0-255
   X-Refresh-Ms      這頁有進行中的比賽時，停留期間每隔多久重抓一次（0 = 不用重抓）
+  X-Chime-*         整點報時：距離下一次報時的毫秒數、報時編號、音檔版本、音量（見 chime.py）
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from . import playlist
 from .aggregator import Aggregator, make_client
+from .chime import Chime
 from .config import Config
 from .render import Renderer
 
@@ -27,6 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 cfg = Config.load(os.environ.get("SCOREBOARD_CONFIG", "config.yaml"))
 agg = Aggregator(cfg)
+chime = Chime(cfg)
 renderer = Renderer(cfg.display["width"], cfg.display["height"], cfg.display.get("fonts"))
 
 
@@ -70,8 +73,28 @@ def frame(page: int = Query(0, ge=0)):
             "X-Brightness": str(playlist.brightness(cfg, now, any(g.state == "live" for g in games))),
             "X-Refresh-Ms": str(int(cfg.raw["poll"]["screen_refresh_seconds"] * 1000) if p.live else 0),
             "Cache-Control": "no-store",
+            **chime.headers(now),
         },
     )
+
+
+@app.get("/chime.pcm")
+def chime_pcm():
+    pcm = chime.pcm()
+    if not pcm:
+        return Response(chime.error or "整點報時沒有設定音檔", status_code=404, media_type="text/plain; charset=utf-8")
+    return Response(pcm, media_type="application/octet-stream", headers={"X-Chime-Ver": chime.version()})
+
+
+@app.post("/api/chime/test")
+def chime_test():
+    """讓看板馬上播一次（下一次來抓畫面時就會播），用來測試音量。"""
+    if not chime.enabled:
+        return JSONResponse({"ok": False, "error": "config.yaml 的 chime.enabled 還沒打開"}, status_code=400)
+    if not chime.pcm():
+        return JSONResponse({"ok": False, "error": chime.error}, status_code=400)
+    chime.test(datetime.now(cfg.tz))
+    return {"ok": True, "seconds": round(len(chime.pcm() or b"") / 2 / 48000, 1)}
 
 
 @app.get("/preview/{page}.png")
@@ -114,7 +137,16 @@ def api_status():
         "pages": len(pages),
         "cycle_seconds": sum(p.hold_ms for p in pages) // 1000,  # 輪播一圈多久，每一場都會在這段時間內出現一次
         "leagues": agg.status(),
+        "chime": _chime_status(),
     }
+
+
+def _chime_status() -> dict:
+    if not chime.enabled:
+        return {"enabled": False}
+    nxt = chime.next_chime(datetime.now(cfg.tz))
+    return {"enabled": True, "next": nxt.isoformat() if nxt else None, "error": chime.error,
+            "seconds": round(len(chime.pcm() or b"") / 2 / 48000, 1)}
 
 
 @app.post("/api/refresh")

@@ -9,6 +9,7 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 
+#include "chime.h"
 #include "config.h"
 
 static MatrixPanel_I2S_DMA *display = nullptr;
@@ -192,8 +193,9 @@ static bool fetchFrame(int p, uint32_t &holdMs) {
   HTTPClient http;
   String url = String(serverUrl) + "/frame?page=" + p;
   if (!http.begin(url)) return false;
-  const char *keys[] = {"X-Pages", "X-Hold-Ms", "X-Brightness", "X-Refresh-Ms"};
-  http.collectHeaders(keys, 4);
+  const char *keys[] = {"X-Pages", "X-Hold-Ms", "X-Brightness", "X-Refresh-Ms",
+                        "X-Chime-In", "X-Chime-Id", "X-Chime-Ver", "X-Chime-Volume"};
+  http.collectHeaders(keys, 8);
   http.setTimeout(6000);
 
   int code = http.GET();
@@ -227,6 +229,9 @@ static bool fetchFrame(int p, uint32_t &holdMs) {
   holdMs = max(1000L, http.header("X-Hold-Ms").toInt());
   long r = http.header("X-Refresh-Ms").toInt();
   refreshMs = r > 0 ? max(1000L, r) : 0;
+  String chimeIn = http.header("X-Chime-In");
+  chimeOnHeaders(chimeIn.length() ? chimeIn.toInt() : -1, http.header("X-Chime-Id"), http.header("X-Chime-Ver"),
+                 http.hasHeader("X-Chime-Volume") ? http.header("X-Chime-Volume").toInt() : -1);
   int b = http.header("X-Brightness").toInt();
   if (b > 0 && b != brightness) {
     brightness = b;
@@ -258,6 +263,7 @@ void setup() {
   setupWifi();
   WiFi.setSleep(false);  // 關掉 WiFi 省電模式，抓畫面和無線更新都比較穩
   setupOta();
+  chimeSetup();
   if (PIN_BTN_NEXT >= 0) pinMode(PIN_BTN_NEXT, INPUT_PULLUP);
   if (PIN_BTN_PAUSE >= 0) pinMode(PIN_BTN_PAUSE, INPUT_PULLUP);
   Serial.printf("server: %s\n", serverUrl);
@@ -265,6 +271,7 @@ void setup() {
 
 void loop() {
   ArduinoOTA.handle();  // 隨時接受無線更新
+  chimeLoop(serverUrl);  // 整點報時：時間到就在背景播放
 
   if (pressed(PIN_BTN_NEXT)) {
     page = (page + 1) % pageCount;

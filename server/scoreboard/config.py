@@ -25,6 +25,16 @@ DEFAULTS = {
         "plg": {"enabled": True, "teams": []},
     },
     "aliases": {},
+    "chime": {
+        "enabled": False,
+        "file": "chime.mp3",
+        "volume": 70,
+        "max_seconds": 20,
+        "weekday": [9, 20],
+        "weekend": [12, 20],
+        "holidays": [],
+        "workdays": [],
+    },
 }
 
 

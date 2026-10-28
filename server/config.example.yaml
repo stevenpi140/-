@@ -45,3 +45,14 @@ leagues:
 # 官方隊名 -> 你想顯示的短名（覆寫自動縮寫）
 aliases: {}
 #  臺北富邦勇士: 富邦
+
+# 整點報時：用看板驅動板上的喇叭播放音檔（目前只有微雪 ESP32-S3-RGB-Matrix 有喇叭）
+chime:
+  enabled: false
+  file: chime.mp3       # 音檔放在 server 資料夾（mp3、m4a、wav… 都可以，需要 ffmpeg）
+  volume: 70            # 0-100
+  max_seconds: 20       # 音檔太長時只播前面這幾秒
+  weekday: [9, 20]      # 平日 09:00～20:00 每個整點
+  weekend: [12, 20]     # 假日 12:00～20:00 每個整點
+  holidays: []          # 國定假日照假日時段，例：["2026-10-10", "2027-01-01"]
+  workdays: []          # 補班日照平日時段，例：["2026-12-26"]

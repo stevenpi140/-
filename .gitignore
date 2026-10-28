@@ -7,3 +7,6 @@ server/preview/
 server/probe/
 firmware/.pio/
 firmware/.vscode/
+
+# 整點報時音檔（自己準備，不放進 repo）
+server/chime.*
