@@ -175,7 +175,7 @@ sudo systemctl enable --now scoreboard
    - 微雪 ESP32-S3-RGB-Matrix：`pio run -e waveshare_s3 -t upload`（按住 BOOT 再插 USB-C，放開後上傳，完成後按 RESET）
    - Trinity：`-e trinity`；一般 ESP32：`-e esp32dev`；MatrixPortal S3：`-e matrixportal_s3`
 4. 第一次開機時，面板會顯示 `Scoreboard-XXXX`。用手機連上這個 WiFi，在跳出的頁面選擇家裡的 WiFi，並填入**伺服器網址**（例如 `http://192.168.1.100:8080`）。
-5. 之後想重新設定，就在開機時按住 **BOOT** 鍵。
+5. 之後想重新設定 WiFi 或伺服器網址：接上電源（或按 RST）後 **2 秒內**按住 **BOOT** 鍵，看到 `RESET WIFI` 再放開。不要在接電之前就按著，那樣會進入燒錄模式。
 
 ### 3. 無線更新韌體（OTA）
 

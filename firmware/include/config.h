@@ -27,7 +27,7 @@
 #define FAILS_BEFORE_ERROR 3
 
 // ===== 按鈕 =====
-// 開機時按住 BOOT 鍵 = 清除 WiFi 設定、重新進入設定頁
+// 開機後 2 秒內按住 BOOT 鍵 = 清除 WiFi 設定、重新進入設定頁（接電之前就按著會進入燒錄模式）
 #define PIN_BTN_RESET 0
 
 #if defined(BOARD_MATRIXPORTAL_S3)

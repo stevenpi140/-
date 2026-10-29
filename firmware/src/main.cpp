@@ -105,8 +105,11 @@ static void saveSettings() {
 static void setupWifi() {
   WiFiManager wm;
   pinMode(PIN_BTN_RESET, INPUT_PULLUP);
-  delay(50);
-  if (digitalRead(PIN_BTN_RESET) == LOW) {
+  // 開機後 2 秒內按住 BOOT = 清除 WiFi 設定。
+  // 不能在接上電源「之前」就按著：BOOT 是 GPIO0，開機那一刻按著 ESP32 會進入燒錄模式
+  bool reset = false;
+  for (uint32_t t0 = millis(); millis() - t0 < 2000 && !reset; delay(20)) reset = digitalRead(PIN_BTN_RESET) == LOW;
+  if (reset) {
     showText("RESET WIFI");
     wm.resetSettings();
     delay(1000);
