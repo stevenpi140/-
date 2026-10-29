@@ -12,4 +12,9 @@ sudo apt install fonts-wqy-zenhei fonts-unifont
 想要更漂亮的 12px 字型，可以把 [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL 授權）
 的 `fusion-pixel-12px-proportional-zh_hant.otf` 放在這個資料夾，程式會優先使用。
 
-Windows / macOS 沒有上述字型時，可以把字型檔放到這裡，並在 `config.yaml` 的 `display.fonts` 指定路徑。
+Windows / macOS 沒有上述字型時，把這兩個檔案直接放在這個資料夾，程式會自動找到：
+
+- `wqy-zenhei.ttc`：到 [文泉驛正黑的 SourceForge 頁面](https://sourceforge.net/projects/wqy/files/wqy-zenhei/) 下載 `wqy-zenhei-*.tar.gz`，解壓縮後取出（Windows 10 以上可以用 `tar -xzf 檔名.tar.gz`）
+- `unifont-*.otf`：到 [GNU Unifont 官網](https://unifoundry.com/unifont/index.html) 下載 OpenType 版本
+
+也可以在 `config.yaml` 的 `display.fonts` 指定其他路徑。

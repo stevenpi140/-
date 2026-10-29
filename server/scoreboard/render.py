@@ -35,12 +35,14 @@ SMALL_CANDIDATES = [
     (str(HERE / "*fusion-pixel-12px*zh_hant*.otf"), 12, 0),
     (str(HERE / "*fusion-pixel-12px*zh_hant*.ttf"), 12, 0),
     ("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", 12, 1),  # 文泉驛點陣正黑（內嵌 12px 點陣）
+    (str(HERE / "wqy-zenhei.ttc"), 12, 1),  # Windows / macOS：把字型檔放在 server/fonts/
     ("/usr/share/fonts/opentype/unifont/unifont.otf", 16, 0),
 ]
 LARGE_CANDIDATES = [
     ("/usr/share/fonts/opentype/unifont/unifont.otf", 16, 0),  # GNU Unifont 16px
     (str(HERE / "unifont*.otf"), 16, 0),
     ("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", 16, 1),
+    (str(HERE / "wqy-zenhei.ttc"), 16, 1),
 ]
 
 # 5x7 點陣數字（比分、時鐘用），每列 5 bit

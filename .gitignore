@@ -10,3 +10,8 @@ firmware/.vscode/
 
 # 整點報時音檔（自己準備，不放進 repo）
 server/chime.*
+
+# 字型檔很大，各自下載放在 server/fonts/，不放進 repo
+server/fonts/*.ttc
+server/fonts/*.otf
+server/fonts/*.ttf
